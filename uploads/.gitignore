@@ -1,0 +1,5 @@
+# Ignore all files in uploads directory
+*
+
+# But keep the directory itself
+!.gitignore

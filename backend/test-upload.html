@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片上传测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+        .result {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .preview {
+            max-width: 300px;
+            max-height: 300px;
+            margin: 10px 0;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <h1>图片上传功能测试</h1>
+    
+    <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+        <p>点击选择图片或拖拽图片到此处</p>
+        <p>支持 JPG、PNG 格式，最大 10MB</p>
+        <input type="file" id="fileInput" accept="image/jpeg,image/jpg,image/png" style="display: none;">
+    </div>
+    
+    <div>
+        <button id="uploadBtn" disabled>上传图片</button>
+        <button id="clearBtn">清除</button>
+    </div>
+    
+    <div id="preview"></div>
+    <div id="result"></div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const preview = document.getElementById('preview');
+        const result = document.getElementById('result');
+        const uploadArea = document.querySelector('.upload-area');
+        
+        let selectedFile = null;
+
+        // File input change handler
+        fileInput.addEventListener('change', handleFileSelect);
+        
+        // Drag and drop handlers
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#007bff';
+            uploadArea.style.backgroundColor = '#f8f9fa';
+        });
+        
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#ccc';
+            uploadArea.style.backgroundColor = '';
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#ccc';
+            uploadArea.style.backgroundColor = '';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleFile(file) {
+            // Validate file type
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+            if (!allowedTypes.includes(file.type)) {
+                showResult('只支持JPG和PNG格式的图片文件', 'error');
+                return;
+            }
+
+            // Validate file size (10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                showResult('文件大小不能超过10MB', 'error');
+                return;
+            }
+
+            selectedFile = file;
+            uploadBtn.disabled = false;
+            
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.innerHTML = `
+                    <h3>预览:</h3>
+                    <img src="${e.target.result}" class="preview" alt="预览图片">
+                    <p>文件名: ${file.name}</p>
+                    <p>文件大小: ${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                    <p>文件类型: ${file.type}</p>
+                `;
+            };
+            reader.readAsDataURL(file);
+            
+            result.innerHTML = '';
+        }
+
+        // Upload button handler
+        uploadBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+            
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '上传中...';
+            
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult(`
+                        <h3>上传成功!</h3>
+                        <p><strong>图片ID:</strong> ${data.data.imageId}</p>
+                        <p><strong>文件名:</strong> ${data.data.filename}</p>
+                        <p><strong>访问URL:</strong> <a href="http://localhost:3001${data.data.imageUrl}" target="_blank">${data.data.imageUrl}</a></p>
+                        <p><strong>原始文件名:</strong> ${data.data.originalName}</p>
+                        <p><strong>文件大小:</strong> ${(data.data.size / 1024 / 1024).toFixed(2)} MB</p>
+                        <p><strong>MIME类型:</strong> ${data.data.mimetype}</p>
+                        <img src="http://localhost:3001${data.data.imageUrl}" class="preview" alt="上传的图片">
+                    `, 'success');
+                } else {
+                    showResult(`上传失败: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult(`上传失败: ${error.message}`, 'error');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '上传图片';
+            }
+        });
+
+        // Clear button handler
+        clearBtn.addEventListener('click', () => {
+            selectedFile = null;
+            fileInput.value = '';
+            uploadBtn.disabled = true;
+            preview.innerHTML = '';
+            result.innerHTML = '';
+        });
+
+        function showResult(message, type) {
+            result.innerHTML = `<div class="result ${type}">${message}</div>`;
+        }
+    </script>
+</body>
+</html>
