@@ -11,9 +11,9 @@ export class TemplateService {
   private readonly promptFile: string;
 
   constructor() {
-    // 使用项目根目录下的image文件夹
+    // 使用项目根目录下的image文件夹（backend的上一级目录）
     this.imageDir = path.join(process.cwd(), '..', 'image');
-    this.promptFile = path.join(this.imageDir, 'prompt.txt');
+    this.promptFile = path.join(process.cwd(), '..', 'prompt', 'prompt.txt');
   }
 
   /**

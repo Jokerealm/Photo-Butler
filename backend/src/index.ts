@@ -17,11 +17,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Static file serving for template images
-const imageDir = path.join(process.cwd(), 'image');
+const imageDir = path.join(process.cwd(), '..', 'image');
 app.use('/images', express.static(imageDir));
 
 // Static file serving for uploaded images
-const uploadDir = path.join(process.cwd(), 'uploads');
+const uploadDir = path.join(process.cwd(), '..', 'uploads');
 app.use('/uploads', express.static(uploadDir));
 
 // API Routes
