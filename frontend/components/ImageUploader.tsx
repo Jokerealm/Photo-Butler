@@ -123,6 +123,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   return (
     <div className="w-full max-w-md mx-auto">
       <div
+        data-testid="upload-area"
         className={`
           relative border-2 border-dashed rounded-lg p-4 sm:p-6 text-center cursor-pointer
           transition-colors duration-200 ease-in-out
@@ -144,6 +145,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           capture="environment" // Enable camera access on mobile
           onChange={handleFileInputChange}
           className="hidden"
+          data-testid="file-input"
         />
 
         {previewUrl ? (
@@ -152,6 +154,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
               src={previewUrl}
               alt="预览图"
               className="max-w-full max-h-32 sm:max-h-48 mx-auto rounded-lg shadow-md"
+              data-testid="image-preview"
             />
             <p className="text-xs sm:text-sm text-gray-600">
               点击重新选择图片
@@ -191,7 +194,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       </div>
 
       {error && (
-        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md" data-testid="error-message">
           <p className="text-xs sm:text-sm text-red-600">{error}</p>
         </div>
       )}

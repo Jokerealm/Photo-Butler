@@ -168,6 +168,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({
             `}
             rows={4}
             maxLength={2000}
+            data-testid="prompt-editor"
           />
           
           {/* Character Count */}

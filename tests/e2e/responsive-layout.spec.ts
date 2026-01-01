@@ -116,7 +116,7 @@ test.describe('Responsive Layout', () => {
     await photoButler.goto();
     
     // Verify mobile upload options
-    const fileInput = photoButler.page.locator('input[type="file"]');
+    const fileInput = photoButler.page.locator('[data-testid="file-input"]');
     const acceptAttribute = await fileInput.getAttribute('accept');
     
     // On mobile, should accept camera input

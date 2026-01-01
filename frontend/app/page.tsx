@@ -295,8 +295,8 @@ export default function Home() {
           /* Generation Flow - Desktop: Multi-column, Mobile: Single column */
           <div className="space-y-6 sm:space-y-8">
             {/* Desktop Layout: Two-column grid for larger screens */}
-            <div className="hidden lg:block">
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            <div className="hidden lg:block" data-testid="desktop-layout">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8" data-testid="main-container">
                 {/* Left Column */}
                 <div className="space-y-8">
                   {/* Step 1: Image Upload */}
@@ -425,7 +425,7 @@ export default function Home() {
             </div>
 
             {/* Mobile Layout: Single column for smaller screens */}
-            <div className="lg:hidden space-y-6">
+            <div className="lg:hidden space-y-6" data-testid="mobile-layout">
               {/* Step 1: Image Upload */}
               <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-6">
                 <div className="flex items-center mb-4 sm:mb-6">

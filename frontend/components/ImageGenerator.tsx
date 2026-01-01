@@ -310,6 +310,7 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }
             `}
+            data-testid="generate-button"
           >
             {isGenerating ? (
               <div className="flex items-center space-x-2">
@@ -358,6 +359,7 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                     className="max-w-full max-h-64 sm:max-h-96 rounded-lg shadow-md"
                     onLoad={() => console.log('Generated image loaded successfully')}
                     onError={() => setError('生成的图片加载失败')}
+                    data-testid="generated-image"
                   />
                 </div>
               </div>
@@ -406,6 +408,7 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                     onClick={handleDownload}
                     disabled={isDownloading}
                     className="px-3 py-2 sm:px-4 sm:py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                    data-testid="download-button"
                   >
                     {isDownloading ? (
                       <div className="flex items-center justify-center space-x-2">

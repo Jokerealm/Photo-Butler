@@ -105,6 +105,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
             }
           `}
           onClick={() => handleTemplateClick(template)}
+          data-testid={`template-${template.id}`}
           role="button"
           tabIndex={disabled ? -1 : 0}
           aria-label={`选择模板: ${template.name}`}

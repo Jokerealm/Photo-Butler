@@ -105,7 +105,7 @@ export const corsConfig = {
  */
 export const generalRateLimit = rateLimit({
   windowMs: SECURITY_CONFIG.RATE_LIMIT.WINDOW_MS,
-  max: SECURITY_CONFIG.RATE_LIMIT.MAX_REQUESTS,
+  max: process.env.NODE_ENV === 'test' ? 1000 : SECURITY_CONFIG.RATE_LIMIT.MAX_REQUESTS, // Higher limit for tests
   message: {
     success: false,
     error: '请求过于频繁，请稍后再试',
@@ -113,6 +113,10 @@ export const generalRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req: Request) => {
+    // Skip rate limiting for test environment
+    return process.env.NODE_ENV === 'test';
+  },
   handler: (req: Request, res: Response) => {
     logger.warn('Rate limit exceeded', {
       ip: req.ip,

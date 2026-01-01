@@ -18,7 +18,7 @@ export class PhotoButlerPage {
   }
 
   async uploadImage(imagePath: string) {
-    const fileInput = this.page.locator('input[type="file"]');
+    const fileInput = this.page.locator('[data-testid="file-input"]');
     await fileInput.setInputFiles(imagePath);
     
     // Wait for upload to complete

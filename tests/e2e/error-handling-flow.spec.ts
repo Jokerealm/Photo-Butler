@@ -6,7 +6,7 @@ test.describe('Error Handling Flow', () => {
     await photoButler.goto();
     
     // Try to upload invalid file format
-    const fileInput = photoButler.page.locator('input[type="file"]');
+    const fileInput = photoButler.page.locator('[data-testid="file-input"]');
     await fileInput.setInputFiles(testImages.invalidFile);
     
     // Verify error message is displayed
