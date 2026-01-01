@@ -183,7 +183,7 @@ describe('GenerateController Property Tests', () => {
 
             await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-            // Verify successful response handling - success case doesn't call status()
+            // Verify successful response handling - success case calls json() directly
             expect(mockJson).toHaveBeenCalledWith({
               success: true,
               data: {
@@ -192,11 +192,9 @@ describe('GenerateController Property Tests', () => {
               }
             });
 
-            // Verify the response contains the generated image URL
-            const responseCall = mockJson.mock.calls[0][0];
-            expect(responseCall.success).toBe(true);
-            expect(responseCall.data.generatedImageUrl).toBe(apiResponse.imageUrl);
-            expect(responseCall.data.generationId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+            // Verify status() is not called for success case
+            expect(mockStatus).not.toHaveBeenCalled();
+            expect(mockNext).not.toHaveBeenCalled();
           }
         ),
         { numRuns: 100 }

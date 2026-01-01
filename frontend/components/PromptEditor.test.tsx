@@ -24,7 +24,7 @@ describe('PromptEditor', () => {
     it('should render component with title', () => {
       render(<PromptEditor {...defaultProps} />);
       
-      expect(screen.getByText('3. 编辑提示词')).toBeInTheDocument();
+      expect(screen.getByText('提示词编辑技巧:')).toBeInTheDocument();
     });
 
     it('should render textarea with placeholder when no template selected', () => {

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import LazyImage from './LazyImage';
+import VirtualList from './VirtualList';
 
 // Template interface matching the backend type
 interface Template {
@@ -94,10 +95,10 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
         <div
           key={template.id}
           className={`
-            relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all duration-200
+            relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all duration-200 touch-manipulation
             ${disabled 
               ? 'opacity-50 cursor-not-allowed' 
-              : 'hover:shadow-lg hover:scale-105'
+              : 'hover:shadow-lg active:scale-95 sm:hover:scale-105'
             }
             ${isSelected 
               ? 'border-blue-500 ring-2 ring-blue-200 shadow-lg' 
@@ -117,7 +118,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
           }}
         >
           {/* Template Preview Image with Lazy Loading */}
-          <div className="aspect-square bg-gray-100 relative overflow-hidden">
+          <div className="w-full bg-gray-100 relative overflow-hidden" style={{ aspectRatio: '340/240' }}>
             <LazyImage
               src={template.previewUrl}
               alt={`${template.name} 预览`}
@@ -130,7 +131,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
             
             {/* Selection Indicator */}
             {isSelected && (
-              <div className="absolute top-1 right-1 sm:top-2 sm:right-2 bg-blue-500 text-white rounded-full p-1">
+              <div className="absolute top-1 right-1 sm:top-2 sm:right-2 bg-blue-500 text-white rounded-full p-1 sm:p-1.5">
                 <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
@@ -141,7 +142,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
           {/* Template Name */}
           <div className="p-2 sm:p-3 bg-white">
             <h3 className={`
-              text-xs sm:text-sm font-medium text-center truncate
+              text-xs sm:text-sm font-medium text-center truncate leading-tight
               ${isSelected ? 'text-blue-600' : 'text-gray-900'}
             `}>
               {template.name}
@@ -180,7 +181,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
           </div>
           <button
             onClick={handleRetry}
-            className="px-3 py-2 sm:px-4 sm:py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-sm sm:text-base"
+            className="px-3 py-2 sm:px-4 sm:py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 active:bg-blue-700 transition-colors text-sm sm:text-base touch-manipulation"
           >
             重试
           </button>
@@ -207,9 +208,21 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
 
   return (
     <div className="w-full">
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
-        {templateItems}
-      </div>
+      {/* Use virtual scrolling for large template lists */}
+      {templates.length > 50 ? (
+        <VirtualList
+          items={templates}
+          itemHeight={200} // Approximate height of template card
+          containerHeight={600} // Fixed container height
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
+          renderItem={(template, index) => templateItems[index]}
+          getItemKey={(template) => template.id}
+        />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+          {templateItems}
+        </div>
+      )}
 
       {/* Selected Template Info */}
       {selectedTemplate && (

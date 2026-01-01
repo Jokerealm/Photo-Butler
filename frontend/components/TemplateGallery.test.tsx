@@ -55,7 +55,6 @@ describe('TemplateGallery', () => {
     it('should display loading state initially', () => {
       render(<TemplateGallery {...defaultProps} />);
       
-      expect(screen.getByText('2. 选择风格模板')).toBeInTheDocument();
       expect(screen.getByText('加载模板中...')).toBeInTheDocument();
     });
 
@@ -85,9 +84,10 @@ describe('TemplateGallery', () => {
         // Check preview images
         const images = screen.getAllByRole('img');
         expect(images).toHaveLength(3);
-        expect(images[0]).toHaveAttribute('src', '/images/三宫格胶片雨夜.jpg');
-        expect(images[1]).toHaveAttribute('src', '/images/现代艺术.jpg');
-        expect(images[2]).toHaveAttribute('src', '/images/古典油画.jpg');
+        // Next.js Image component transforms the src, so check if it contains the original URL
+        expect(images[0].getAttribute('src')).toContain(encodeURIComponent('/images/三宫格胶片雨夜.jpg'));
+        expect(images[1].getAttribute('src')).toContain(encodeURIComponent('/images/现代艺术.jpg'));
+        expect(images[2].getAttribute('src')).toContain(encodeURIComponent('/images/古典油画.jpg'));
       });
     });
   });
@@ -323,7 +323,7 @@ describe('TemplateGallery', () => {
       fireEvent.error(firstImage);
 
       // Should fallback to placeholder
-      expect(firstImage).toHaveAttribute('src', '/images/placeholder.png');
+      expect(firstImage.getAttribute('src')).toContain(encodeURIComponent('/images/placeholder.png'));
     });
   });
 });

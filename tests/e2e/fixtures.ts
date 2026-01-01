@@ -17,8 +17,28 @@ export class PhotoButlerPage {
     await this.page.waitForLoadState('networkidle');
   }
 
+  async getCurrentLayout() {
+    const viewport = await this.page.viewportSize();
+    const isMobile = viewport && viewport.width < 1024; // lg breakpoint
+    return isMobile ? 'mobile' : 'desktop';
+  }
+
+  async getVisibleUploadArea() {
+    const layout = await this.getCurrentLayout();
+    return layout === 'mobile' 
+      ? this.page.locator('[data-testid="mobile-layout"] [data-testid="upload-area"]')
+      : this.page.locator('[data-testid="desktop-layout"] [data-testid="upload-area"]');
+  }
+
   async uploadImage(imagePath: string) {
-    const fileInput = this.page.locator('[data-testid="file-input"]');
+    // Determine which layout is visible and use the appropriate selector
+    const viewport = await this.page.viewportSize();
+    const isMobile = viewport && viewport.width < 1024; // lg breakpoint
+    
+    const fileInput = isMobile 
+      ? this.page.locator('[data-testid="mobile-layout"] [data-testid="file-input"]')
+      : this.page.locator('[data-testid="desktop-layout"] [data-testid="file-input"]');
+    
     await fileInput.setInputFiles(imagePath);
     
     // Wait for upload to complete
@@ -26,18 +46,34 @@ export class PhotoButlerPage {
   }
 
   async selectTemplate(templateName: string) {
-    await this.page.click(`[data-testid="template-${templateName}"]`);
-    await this.page.waitForSelector(`[data-testid="template-${templateName}"].selected`);
+    const layout = await this.getCurrentLayout();
+    const templateSelector = layout === 'mobile'
+      ? `[data-testid="mobile-layout"] [data-testid="template-${templateName}"]`
+      : `[data-testid="desktop-layout"] [data-testid="template-${templateName}"]`;
+    
+    await this.page.click(templateSelector);
+    
+    // Wait for template to be selected (check for selected class)
+    await this.page.waitForSelector(`${templateSelector}.selected`, { timeout: 5000 });
   }
 
   async editPrompt(promptText: string) {
-    const promptEditor = this.page.locator('[data-testid="prompt-editor"]');
+    const layout = await this.getCurrentLayout();
+    const promptEditor = layout === 'mobile'
+      ? this.page.locator('[data-testid="mobile-layout"] [data-testid="prompt-editor"]')
+      : this.page.locator('[data-testid="desktop-layout"] [data-testid="prompt-editor"]');
+    
     await promptEditor.clear();
     await promptEditor.fill(promptText);
   }
 
   async generateImage() {
-    await this.page.click('[data-testid="generate-button"]');
+    const layout = await this.getCurrentLayout();
+    const generateButton = layout === 'mobile'
+      ? this.page.locator('[data-testid="mobile-layout"] [data-testid="generate-button"]')
+      : this.page.locator('[data-testid="desktop-layout"] [data-testid="generate-button"]');
+    
+    await generateButton.click();
     
     // Wait for generation to complete (with longer timeout for API call)
     await this.page.waitForSelector('[data-testid="generated-image"]', { timeout: 60000 });

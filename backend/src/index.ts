@@ -2,12 +2,14 @@ import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import { createServer } from 'http';
 import templateRoutes from './routes/templateRoutes';
 import uploadRoutes from './routes/uploadRoutes';
 import generateRoutes from './routes/generateRoutes';
 import downloadRoutes from './routes/downloadRoutes';
 import maintenanceRoutes from './routes/maintenanceRoutes';
 import { databaseService } from './services/databaseService';
+import { websocketService } from './services/websocketService';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { 
   helmetConfig, 
@@ -25,6 +27,7 @@ dotenv.config();
 validateEnvironmentVariables();
 
 const app: Express = express();
+const server = createServer(app);
 const port = process.env.PORT || 3001;
 
 // Security middleware (must be first)
@@ -54,6 +57,23 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/generate', generateRoutes);
 app.use('/api/download', downloadRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
+
+// Root route
+app.get('/', (_req: Request, res: Response) => {
+  res.json({
+    success: true,
+    message: 'Photo Butler API is running',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      templates: '/api/templates',
+      upload: '/api/upload',
+      generate: '/api/generate',
+      download: '/api/download',
+      maintenance: '/api/maintenance'
+    }
+  });
+});
 
 // Health check route
 app.get('/health', async (_req: Request, res: Response) => {
@@ -86,9 +106,13 @@ async function initializeApp() {
     logger.error('Database initialization failed, continuing without database:', error);
   }
   
+  // Initialize WebSocket service
+  websocketService.initialize(server);
+  
   // Start server
-  app.listen(port, () => {
+  server.listen(port, () => {
     logger.info(`⚡️[server]: Server is running at http://localhost:${port}`);
+    logger.info(`WebSocket server is running at ws://localhost:${port}/ws`);
     logger.info(`Database status: ${databaseService.isAvailable() ? 'Available' : 'Not available (using localStorage only)'}`);
   });
 }
@@ -102,12 +126,14 @@ initializeApp().catch((error) => {
 // Graceful shutdown
 process.on('SIGINT', async () => {
   logger.info('Received SIGINT. Graceful shutdown...');
+  websocketService.close();
   await databaseService.close();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   logger.info('Received SIGTERM. Graceful shutdown...');
+  websocketService.close();
   await databaseService.close();
   process.exit(0);
 });

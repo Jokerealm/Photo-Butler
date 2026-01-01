@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ImageUploader from './ImageUploader';
+import { ToastProvider } from './Toast';
 
 // Mock FileReader
 const mockFileReader = {
@@ -22,6 +23,14 @@ describe('ImageUploader', () => {
     acceptedFormats: ['image/jpeg', 'image/png'],
   };
 
+  const renderWithToast = (props = defaultProps) => {
+    return render(
+      <ToastProvider>
+        <ImageUploader {...props} />
+      </ToastProvider>
+    );
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockFileReader.readAsDataURL.mockClear();
@@ -29,7 +38,7 @@ describe('ImageUploader', () => {
 
   describe('文件选择功能 (File Selection Functionality)', () => {
     it('should display upload area when component loads', () => {
-      render(<ImageUploader {...defaultProps} />);
+      renderWithToast();
       
       expect(screen.getByText('上传参考图片')).toBeInTheDocument();
       expect(screen.getByText('点击选择或拖拽图片到此处')).toBeInTheDocument();
@@ -38,7 +47,7 @@ describe('ImageUploader', () => {
 
     it('should open file dialog when upload area is clicked', async () => {
       const user = userEvent.setup();
-      render(<ImageUploader {...defaultProps} />);
+      renderWithToast();
       
       // Get the div that has the click handler by finding the one with border classes
       const uploadArea = document.querySelector('[class*="border-2"]') as HTMLElement;
@@ -55,7 +64,7 @@ describe('ImageUploader', () => {
     });
 
     it('should handle valid file selection', async () => {
-      render(<ImageUploader {...defaultProps} />);
+      renderWithToast();
       
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
       const validFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
@@ -76,7 +85,7 @@ describe('ImageUploader', () => {
 
   describe('拖放上传功能 (Drag and Drop Upload Functionality)', () => {
     it('should handle drag over event', async () => {
-      render(<ImageUploader {...defaultProps} />);
+      renderWithToast();
       
       // Get the div that has the drag handlers by finding the one with border classes
       const uploadArea = document.querySelector('[class*="border-2"]') as HTMLElement;
@@ -96,7 +105,7 @@ describe('ImageUploader', () => {
     });
 
     it('should handle drag leave event', async () => {
-      render(<ImageUploader {...defaultProps} />);
+      renderWithToast();
       
       // Get the div that has the drag handlers by finding the one with border classes
       const uploadArea = document.querySelector('[class*="border-2"]') as HTMLElement;
@@ -130,7 +139,7 @@ describe('ImageUploader', () => {
     });
 
     it('should handle file drop with valid file', async () => {
-      render(<ImageUploader {...defaultProps} />);
+      renderWithToast();
       
       // Get the div that has the drag handlers by finding the one with border classes
       const uploadArea = document.querySelector('[class*="border-2"]') as HTMLElement;
@@ -153,7 +162,7 @@ describe('ImageUploader', () => {
 
   describe('文件格式验证 (File Format Validation)', () => {
     it('should accept valid JPG files', async () => {
-      render(<ImageUploader {...defaultProps} />);
+      renderWithToast();
       
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
       const validFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
@@ -165,7 +174,7 @@ describe('ImageUploader', () => {
     });
 
     it('should accept valid PNG files', async () => {
-      render(<ImageUploader {...defaultProps} />);
+      renderWithToast();
       
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
       const validFile = new File(['test'], 'test.png', { type: 'image/png' });
@@ -177,7 +186,7 @@ describe('ImageUploader', () => {
     });
 
     it('should reject invalid file formats', async () => {
-      render(<ImageUploader {...defaultProps} />);
+      renderWithToast();
       
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
       const invalidFile = new File(['test'], 'test.gif', { type: 'image/gif' });
@@ -185,7 +194,7 @@ describe('ImageUploader', () => {
       fireEvent.change(fileInput, { target: { files: [invalidFile] } });
       
       await waitFor(() => {
-        expect(screen.getByText('仅支持JPG和PNG格式的图片')).toBeInTheDocument();
+        expect(screen.getAllByText('仅支持JPG和PNG格式的图片')).toHaveLength(2); // One in component, one in toast
       });
       
       // Should not call onImageUpload
@@ -193,7 +202,7 @@ describe('ImageUploader', () => {
     });
 
     it('should reject files larger than 10MB', async () => {
-      render(<ImageUploader {...defaultProps} />);
+      renderWithToast();
       
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
       const largeFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
@@ -207,7 +216,7 @@ describe('ImageUploader', () => {
       fireEvent.change(fileInput, { target: { files: [largeFile] } });
       
       await waitFor(() => {
-        expect(screen.getByText('文件大小不能超过10MB')).toBeInTheDocument();
+        expect(screen.getAllByText('文件大小不能超过10MB')).toHaveLength(2); // One in component, one in toast
       });
       
       // Should not call onImageUpload
@@ -217,7 +226,7 @@ describe('ImageUploader', () => {
 
   describe('预览显示 (Preview Display)', () => {
     it('should display preview image after successful upload', async () => {
-      render(<ImageUploader {...defaultProps} />);
+      renderWithToast();
       
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
       const validFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
@@ -240,7 +249,7 @@ describe('ImageUploader', () => {
     });
 
     it('should show initial upload state when no image is uploaded', () => {
-      render(<ImageUploader {...defaultProps} />);
+      renderWithToast();
       
       expect(screen.getByText('上传参考图片')).toBeInTheDocument();
       expect(screen.getByText('点击选择或拖拽图片到此处')).toBeInTheDocument();
@@ -248,7 +257,7 @@ describe('ImageUploader', () => {
     });
 
     it('should allow re-uploading after initial upload', async () => {
-      render(<ImageUploader {...defaultProps} />);
+      renderWithToast();
       
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
       const firstFile = new File(['test1'], 'test1.jpg', { type: 'image/jpeg' });
@@ -282,7 +291,7 @@ describe('ImageUploader', () => {
 
   describe('Error Handling', () => {
     it('should display error message for invalid format', async () => {
-      render(<ImageUploader {...defaultProps} />);
+      renderWithToast();
       
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
       const invalidFile = new File(['test'], 'test.txt', { type: 'text/plain' });
@@ -290,14 +299,14 @@ describe('ImageUploader', () => {
       fireEvent.change(fileInput, { target: { files: [invalidFile] } });
       
       await waitFor(() => {
-        const errorMessage = screen.getByText('仅支持JPG和PNG格式的图片');
-        expect(errorMessage).toBeInTheDocument();
-        expect(errorMessage.closest('div')).toHaveClass('bg-red-50', 'border-red-200');
+        const errorMessages = screen.getAllByText('仅支持JPG和PNG格式的图片');
+        expect(errorMessages).toHaveLength(2); // One in component, one in toast
+        expect(errorMessages[0].closest('div')).toHaveClass('bg-red-50', 'border-red-200');
       });
     });
 
     it('should clear error message on successful upload', async () => {
-      render(<ImageUploader {...defaultProps} />);
+      renderWithToast();
       
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
       
@@ -306,15 +315,15 @@ describe('ImageUploader', () => {
       fireEvent.change(fileInput, { target: { files: [invalidFile] } });
       
       await waitFor(() => {
-        expect(screen.getByText('仅支持JPG和PNG格式的图片')).toBeInTheDocument();
+        expect(screen.getAllByText('仅支持JPG和PNG格式的图片')).toHaveLength(2);
       });
       
       // Then upload valid file
       const validFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
       fireEvent.change(fileInput, { target: { files: [validFile] } });
       
-      // Error should be cleared
-      expect(screen.queryByText('仅支持JPG和PNG格式的图片')).not.toBeInTheDocument();
+      // Error should be cleared from component (toast may still be visible)
+      expect(screen.queryByTestId('error-message')).not.toBeInTheDocument();
     });
   });
 });

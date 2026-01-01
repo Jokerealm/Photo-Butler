@@ -7,8 +7,9 @@ test.describe('Smoke Tests', () => {
     // Verify basic page structure
     await expect(photoButler.page).toHaveTitle(/Photo Butler|AI图片生成/);
     
-    // Verify main components are present
-    await expect(photoButler.page.locator('[data-testid="upload-area"]')).toBeVisible();
+    // Verify main components are present - use the helper method to get visible upload area
+    const uploadArea = await photoButler.getVisibleUploadArea();
+    await expect(uploadArea).toBeVisible();
     
     console.log('✅ Application loads successfully');
   });

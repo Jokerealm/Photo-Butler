@@ -35,7 +35,7 @@ describe('ImageGenerator', () => {
       />
     );
 
-    expect(screen.getByText('4. 生成AI图片')).toBeInTheDocument();
+    expect(screen.getByText('开始生成')).toBeInTheDocument();
   });
 
   it('shows ready status when all requirements are met', () => {

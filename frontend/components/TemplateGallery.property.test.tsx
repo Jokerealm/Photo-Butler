@@ -94,7 +94,9 @@ describe('TemplateGallery Property Tests', () => {
             // Check preview image is displayed with correct src
             const imageElement = screen.getByAltText(`${template.name} 预览`);
             expect(imageElement).toBeInTheDocument();
-            expect(imageElement).toHaveAttribute('src', template.previewUrl);
+            // Next.js Image component transforms the src, so check if it contains the original URL
+            const srcAttribute = imageElement.getAttribute('src');
+            expect(srcAttribute).toContain(encodeURIComponent(template.previewUrl));
           }
 
           return true;

@@ -6,8 +6,9 @@ test.describe('Complete Image Generation Flow', () => {
     // Step 1: Navigate to the application
     await photoButler.goto();
     
-    // Verify initial state
-    await expect(photoButler.page.locator('[data-testid="upload-area"]')).toBeVisible();
+    // Verify initial state - use helper method for visible upload area
+    const uploadArea = await photoButler.getVisibleUploadArea();
+    await expect(uploadArea).toBeVisible();
     
     // Step 2: Upload reference image
     await photoButler.uploadImage(testImages.validJpg);
@@ -16,18 +17,31 @@ test.describe('Complete Image Generation Flow', () => {
     await expect(photoButler.page.locator('[data-testid="image-preview"]')).toBeVisible();
     
     // Step 3: Wait for templates to load and select a template
-    await photoButler.page.waitForSelector('[data-testid^="template-"]', { timeout: 10000 });
+    const layout = await photoButler.getCurrentLayout();
+    const templateSelector = layout === 'mobile' 
+      ? '[data-testid="mobile-layout"] [data-testid^="template-"]'
+      : '[data-testid="desktop-layout"] [data-testid^="template-"]';
+    
+    await photoButler.page.waitForSelector(templateSelector, { timeout: 10000 });
     
     // Get the first available template
-    const firstTemplate = await photoButler.page.locator('[data-testid^="template-"]').first();
+    const firstTemplate = await photoButler.page.locator(templateSelector).first();
     const templateId = await firstTemplate.getAttribute('data-testid');
     const templateName = templateId?.replace('template-', '') || '';
     
     await photoButler.selectTemplate(templateName);
     
     // Verify template is selected and prompt is loaded
-    await expect(photoButler.page.locator(`[data-testid="template-${templateName}"]`)).toHaveClass(/selected/);
-    await expect(photoButler.page.locator('[data-testid="prompt-editor"]')).not.toBeEmpty();
+    const selectedTemplateSelector = layout === 'mobile'
+      ? `[data-testid="mobile-layout"] [data-testid="template-${templateName}"]`
+      : `[data-testid="desktop-layout"] [data-testid="template-${templateName}"]`;
+    await expect(photoButler.page.locator(selectedTemplateSelector)).toHaveClass(/selected/);
+    
+    // Check prompt editor based on current layout
+    const promptEditor = layout === 'mobile'
+      ? photoButler.page.locator('[data-testid="mobile-layout"] [data-testid="prompt-editor"]')
+      : photoButler.page.locator('[data-testid="desktop-layout"] [data-testid="prompt-editor"]');
+    await expect(promptEditor).not.toBeEmpty();
     
     // Step 4: Edit prompt (optional)
     const customPrompt = '测试提示词，生成一张美丽的艺术图片';

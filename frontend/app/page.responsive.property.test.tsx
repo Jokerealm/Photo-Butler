@@ -9,6 +9,20 @@ import { act } from 'react';
 import fc from 'fast-check';
 import Home from './page';
 
+// Mock Next.js router
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+    back: jest.fn(),
+    forward: jest.fn(),
+    refresh: jest.fn(),
+  }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 // Mock the components to focus on layout testing
 jest.mock('../components/ImageUploader', () => {
   return function MockImageUploader() {
