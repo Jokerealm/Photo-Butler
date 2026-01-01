@@ -58,6 +58,7 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [generationId, setGenerationId] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Check if generation can be started
   const canGenerate = referenceImage && prompt.trim().length > 0 && selectedTemplate && !disabled;
@@ -189,17 +190,54 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     handleGenerate();
   }, [handleGenerate]);
 
+  // Handle download
+  const handleDownload = useCallback(async () => {
+    if (!generatedImage || !generationId || !selectedTemplate) {
+      console.warn('Missing required data for download');
+      return;
+    }
+
+    setIsDownloading(true);
+
+    try {
+      console.log('Starting image download...');
+
+      // 构建下载URL
+      const downloadUrl = `/api/download/${generationId}?${new URLSearchParams({
+        url: generatedImage,
+        template: selectedTemplate.name,
+        timestamp: Date.now().toString()
+      })}`;
+
+      console.log(`Download URL: ${downloadUrl}`);
+
+      // 创建隐藏的下载链接并触发下载
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      console.log('Download initiated successfully');
+
+    } catch (error) {
+      console.error('Download error:', error);
+      setError('图片下载失败，请重试');
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [generatedImage, generationId, selectedTemplate]);
+
   return (
     <div className="w-full">
-      <h2 className="text-2xl font-semibold mb-4">4. 生成AI图片</h2>
-      
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Generation Status */}
-        <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+        <div className="p-3 sm:p-4 bg-gray-50 border border-gray-200 rounded-lg">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">生成状态</span>
+            <span className="text-xs sm:text-sm font-medium text-gray-700">生成状态</span>
             {isGenerating && (
-              <span className="text-sm text-blue-600">{progress}%</span>
+              <span className="text-xs sm:text-sm text-blue-600">{progress}%</span>
             )}
           </div>
           
@@ -217,10 +255,10 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           <div className="space-y-2">
             {!canGenerate && (
               <div className="flex items-center space-x-2 text-gray-500">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                 </svg>
-                <span className="text-sm">
+                <span className="text-xs sm:text-sm">
                   {!referenceImage && '请先上传参考图片'}
                   {referenceImage && !selectedTemplate && '请选择一个模板'}
                   {referenceImage && selectedTemplate && prompt.trim().length === 0 && '请输入提示词'}
@@ -230,17 +268,17 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
             {canGenerate && !isGenerating && !generatedImage && (
               <div className="flex items-center space-x-2 text-green-600">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
-                <span className="text-sm">准备就绪，可以开始生成</span>
+                <span className="text-xs sm:text-sm">准备就绪，可以开始生成</span>
               </div>
             )}
 
             {isGenerating && (
               <div className="flex items-center space-x-2 text-blue-600">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                <span className="text-sm">
+                <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-blue-500"></div>
+                <span className="text-xs sm:text-sm">
                   {progress <= 10 && '正在上传参考图片...'}
                   {progress > 10 && progress <= 30 && '正在调用AI生成服务...'}
                   {progress > 30 && progress < 100 && '正在生成图片，请稍候...'}
@@ -251,10 +289,10 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
             {generatedImage && (
               <div className="flex items-center space-x-2 text-green-600">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
-                <span className="text-sm">图片生成成功！</span>
+                <span className="text-xs sm:text-sm">图片生成成功！</span>
               </div>
             )}
           </div>
@@ -266,7 +304,7 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
             onClick={handleGenerate}
             disabled={!canGenerate || isGenerating}
             className={`
-              px-8 py-3 rounded-lg font-medium text-lg transition-all duration-200
+              px-6 py-2 sm:px-8 sm:py-3 rounded-lg font-medium text-base sm:text-lg transition-all duration-200
               ${canGenerate && !isGenerating
                 ? 'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-lg transform hover:scale-105'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -275,7 +313,7 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           >
             {isGenerating ? (
               <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
                 <span>生成中...</span>
               </div>
             ) : (
@@ -286,17 +324,17 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
         {/* Error Display */}
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-start space-x-3">
-              <svg className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
               <div className="flex-1">
-                <h4 className="text-sm font-medium text-red-800 mb-1">生成失败</h4>
-                <p className="text-sm text-red-700">{error}</p>
+                <h4 className="text-xs sm:text-sm font-medium text-red-800 mb-1">生成失败</h4>
+                <p className="text-xs sm:text-sm text-red-700">{error}</p>
                 <button
                   onClick={retryGeneration}
-                  className="mt-3 px-4 py-2 bg-red-100 text-red-800 rounded-md hover:bg-red-200 transition-colors text-sm font-medium"
+                  className="mt-2 sm:mt-3 px-3 py-1 sm:px-4 sm:py-2 bg-red-100 text-red-800 rounded-md hover:bg-red-200 transition-colors text-xs sm:text-sm font-medium"
                 >
                   重试
                 </button>
@@ -307,17 +345,17 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
         {/* Generated Image Display */}
         {generatedImage && (
-          <div className="p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">生成结果</h3>
+          <div className="p-4 sm:p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
+            <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">生成结果</h3>
             
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {/* Generated Image */}
               <div className="flex justify-center">
                 <div className="relative">
                   <img
                     src={generatedImage}
                     alt="AI生成的图片"
-                    className="max-w-full max-h-96 rounded-lg shadow-md"
+                    className="max-w-full max-h-64 sm:max-h-96 rounded-lg shadow-md"
                     onLoad={() => console.log('Generated image loaded successfully')}
                     onError={() => setError('生成的图片加载失败')}
                   />
@@ -325,8 +363,8 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
               </div>
 
               {/* Generation Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="space-y-2">
+              <div className="grid grid-cols-1 gap-3 sm:gap-4 text-xs sm:text-sm">
+                <div className="space-y-1 sm:space-y-2">
                   <div>
                     <span className="font-medium text-gray-700">使用模板:</span>
                     <span className="ml-2 text-gray-600">{selectedTemplate?.name}</span>
@@ -337,8 +375,6 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                       {new Date().toLocaleString('zh-CN')}
                     </span>
                   </div>
-                </div>
-                <div className="space-y-2">
                   <div>
                     <span className="font-medium text-gray-700">生成ID:</span>
                     <span className="ml-2 text-gray-600 font-mono text-xs">
@@ -347,7 +383,7 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
                   </div>
                   <div>
                     <span className="font-medium text-gray-700">提示词:</span>
-                    <span className="ml-2 text-gray-600 truncate block">
+                    <span className="ml-2 text-gray-600 break-words">
                       {prompt}
                     </span>
                   </div>
@@ -355,30 +391,40 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex justify-center space-x-4 pt-4 border-t border-gray-200">
+              <div className="flex flex-col sm:flex-row justify-center space-y-2 sm:space-y-0 sm:space-x-4 pt-3 sm:pt-4 border-t border-gray-200">
                 <button
                   onClick={handleGenerate}
                   disabled={isGenerating}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-2 sm:px-4 sm:py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                 >
                   重新生成
                 </button>
                 
-                <a
-                  href={generatedImage}
-                  download={`ai-generated-${selectedTemplate?.name}-${Date.now()}.jpg`}
-                  className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
-                >
-                  下载图片
-                </a>
+                {/* Download Button - only show when image is generated */}
+                {generatedImage && generationId && (
+                  <button
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                    className="px-3 py-2 sm:px-4 sm:py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                  >
+                    {isDownloading ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+                        <span>下载中...</span>
+                      </div>
+                    ) : (
+                      '下载图片'
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>
         )}
 
         {/* Usage Tips */}
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h4 className="text-sm font-medium text-blue-900 mb-2">生成提示:</h4>
+        <div className="p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <h4 className="text-xs sm:text-sm font-medium text-blue-900 mb-2">生成提示:</h4>
           <ul className="text-xs text-blue-800 space-y-1">
             <li>• 生成过程通常需要10-30秒，请耐心等待</li>
             <li>• 如果生成失败，可以尝试调整提示词后重试</li>

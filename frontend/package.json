@@ -11,10 +11,13 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@tailwindcss/line-clamp": "^0.4.4",
     "axios": "^1.7.9",
     "next": "^15.1.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-intersection-observer": "^10.0.0",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

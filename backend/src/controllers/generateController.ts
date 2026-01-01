@@ -5,6 +5,8 @@ import crypto from 'crypto';
 import { DoubaoAPIClient, getDoubaoAPIClient } from '../services/doubaoAPIClient';
 import { templateService } from '../services/templateService';
 import { GenerateRequest, GenerateResponse } from '../types/generate';
+import { ValidationError, NotFoundError, APIError, asyncHandler } from '../middleware/errorHandler';
+import { logger } from '../utils/logger';
 
 /**
  * Generate controller
@@ -23,142 +25,87 @@ export class GenerateController {
    * 
    * POST /api/generate
    */
-  async generateImage(req: Request, res: Response): Promise<void> {
-    try {
-      console.log('Starting image generation request...');
-      
-      // 参数验证
-      const { imageId, prompt, templateId }: GenerateRequest = req.body;
-      
-      if (!imageId || typeof imageId !== 'string') {
-        console.warn('Invalid imageId parameter:', imageId);
-        res.status(400).json({
-          success: false,
-          error: '缺少有效的图片ID参数'
-        } as GenerateResponse);
-        return;
-      }
-
-      if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
-        console.warn('Invalid prompt parameter:', prompt);
-        res.status(400).json({
-          success: false,
-          error: '缺少有效的提示词参数'
-        } as GenerateResponse);
-        return;
-      }
-
-      if (!templateId || typeof templateId !== 'string') {
-        console.warn('Invalid templateId parameter:', templateId);
-        res.status(400).json({
-          success: false,
-          error: '缺少有效的模板ID参数'
-        } as GenerateResponse);
-        return;
-      }
-
-      console.log(`Generation request - ImageID: ${imageId}, TemplateID: ${templateId}, Prompt: ${prompt.substring(0, 50)}...`);
-
-      // 验证上传的图片是否存在
-      const imagePath = this.getImagePath(imageId);
-      if (!fs.existsSync(imagePath)) {
-        console.error(`Reference image not found: ${imagePath}`);
-        res.status(404).json({
-          success: false,
-          error: '参考图片不存在，请重新上传'
-        } as GenerateResponse);
-        return;
-      }
-
-      // 验证模板是否存在
-      const template = await templateService.getTemplateById(templateId);
-      if (!template) {
-        console.error(`Template not found: ${templateId}`);
-        res.status(404).json({
-          success: false,
-          error: '指定的模板不存在'
-        } as GenerateResponse);
-        return;
-      }
-
-      console.log(`Using template: ${template.name}`);
-
-      // 读取参考图片
-      const referenceImageBuffer = fs.readFileSync(imagePath);
-      console.log(`Reference image loaded: ${referenceImageBuffer.length} bytes`);
-
-      // 调用豆包API生成图片
-      console.log('Calling Doubao API for image generation...');
-      const generateResult = await this.doubaoClient.generateImageAndWait({
-        referenceImage: referenceImageBuffer,
-        prompt: prompt.trim(),
-        templateId: templateId
-      });
-
-      if (!generateResult.success) {
-        console.error('Doubao API generation failed:', generateResult.error);
-        res.status(500).json({
-          success: false,
-          error: generateResult.error || '图片生成失败'
-        } as GenerateResponse);
-        return;
-      }
-
-      if (!generateResult.data?.imageUrl) {
-        console.error('No image URL returned from Doubao API');
-        res.status(500).json({
-          success: false,
-          error: '图片生成失败：未返回图片URL'
-        } as GenerateResponse);
-        return;
-      }
-
-      // 生成记录ID
-      const generationId = crypto.randomUUID();
-      
-      console.log(`Image generation successful - GenerationID: ${generationId}, ImageURL: ${generateResult.data.imageUrl}`);
-
-      // 返回成功响应
-      const response: GenerateResponse = {
-        success: true,
-        data: {
-          generatedImageUrl: generateResult.data.imageUrl,
-          generationId: generationId
-        }
-      };
-
-      res.json(response);
-
-    } catch (error) {
-      console.error('Error in generateImage:', error);
-      
-      // 处理不同类型的错误
-      let errorMessage = '图片生成失败';
-      let statusCode = 500;
-
-      if (error instanceof Error) {
-        if (error.message.includes('DOUBAO_API_KEY')) {
-          errorMessage = 'API配置错误，请联系管理员';
-          statusCode = 500;
-        } else if (error.message.includes('timeout') || error.message.includes('ETIMEDOUT')) {
-          errorMessage = '请求超时，请稍后重试';
-          statusCode = 504;
-        } else if (error.message.includes('network') || error.message.includes('ECONNREFUSED')) {
-          errorMessage = '网络连接失败，请检查网络连接';
-          statusCode = 503;
-        } else {
-          errorMessage = error.message;
-        }
-      }
-
-      const response: GenerateResponse = {
-        success: false,
-        error: errorMessage
-      };
-
-      res.status(statusCode).json(response);
+  generateImage = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    logger.info('Starting image generation request...');
+    
+    // 参数验证
+    const { imageId, prompt, templateId }: GenerateRequest = req.body;
+    
+    if (!imageId || typeof imageId !== 'string') {
+      throw new ValidationError('缺少有效的图片ID参数', 'imageId');
     }
-  }
+
+    if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
+      throw new ValidationError('缺少有效的提示词参数', 'prompt');
+    }
+
+    if (!templateId || typeof templateId !== 'string') {
+      throw new ValidationError('缺少有效的模板ID参数', 'templateId');
+    }
+
+    logger.info('Generation request validated', {
+      imageId,
+      templateId,
+      promptLength: prompt.length
+    });
+
+    // 验证上传的图片是否存在
+    const imagePath = this.getImagePath(imageId);
+    if (!fs.existsSync(imagePath)) {
+      logger.error(`Reference image not found: ${imagePath}`);
+      throw new NotFoundError('参考图片', imageId);
+    }
+
+    // 验证模板是否存在
+    const template = await templateService.getTemplateById(templateId);
+    if (!template) {
+      logger.error(`Template not found: ${templateId}`);
+      throw new NotFoundError('模板', templateId);
+    }
+
+    logger.info(`Using template: ${template.name}`);
+
+    // 读取参考图片
+    const referenceImageBuffer = fs.readFileSync(imagePath);
+    logger.info(`Reference image loaded: ${referenceImageBuffer.length} bytes`);
+
+    // 调用豆包API生成图片
+    logger.info('Calling Doubao API for image generation...');
+    const generateResult = await this.doubaoClient.generateImageAndWait({
+      referenceImage: referenceImageBuffer,
+      prompt: prompt.trim(),
+      templateId: templateId
+    });
+
+    if (!generateResult.success) {
+      logger.error('Doubao API generation failed:', generateResult.error);
+      throw new APIError(generateResult.error || '图片生成失败');
+    }
+
+    if (!generateResult.data?.imageUrl) {
+      logger.error('No image URL returned from Doubao API');
+      throw new APIError('图片生成失败：未返回图片URL');
+    }
+
+    // 生成记录ID
+    const generationId = crypto.randomUUID();
+    
+    logger.info('Image generation successful', {
+      generationId,
+      imageUrl: generateResult.data.imageUrl
+    });
+
+    // 返回成功响应
+    const response: GenerateResponse = {
+      success: true,
+      data: {
+        generatedImageUrl: generateResult.data.imageUrl,
+        generationId: generationId
+      }
+    };
+
+    res.json(response);
+  });
 
   /**
    * 根据图片ID获取图片文件路径

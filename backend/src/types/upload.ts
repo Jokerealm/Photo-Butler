@@ -7,6 +7,12 @@ export interface UploadResponse {
     originalName: string;
     size: number;
     mimetype: string;
+    dimensions?: {
+      width?: number;
+      height?: number;
+    };
+    thumbnails?: { [size: string]: string };
+    compressed?: boolean;
   };
   error?: string;
 }

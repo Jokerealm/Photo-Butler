@@ -58,7 +58,7 @@ describe('DoubaoAPIClient', () => {
       const client = new DoubaoAPIClient();
       const config = client.getConfigInfo();
       
-      expect(config.baseUrl).toBe('https://api.doubao.com/v1');
+      expect(config.baseUrl).toBe('https://ark.cn-beijing.volces.com/api/v3');
     });
 
     it('should use custom base URL when provided', () => {
@@ -147,16 +147,13 @@ describe('DoubaoAPIClient', () => {
 
       await client.generateImage(request);
 
-      expect(mockInstance.post).toHaveBeenCalledWith('', {
-        model: "ep-20241231172228-8xqzr",
-        messages: [
-          {
-            role: "user",
-            content: "请根据以下描述生成图片：测试提示词"
-          }
-        ],
-        max_tokens: 1000,
-        temperature: 0.7
+      expect(mockInstance.post).toHaveBeenCalledWith('/images/generations', {
+        model: "doubao-seedream-4-5-251128",
+        prompt: "测试提示词",
+        image: "data:image/jpeg;base64,dGVzdC1pbWFnZS1kYXRh",
+        size: "2K",
+        response_format: "url",
+        watermark: false
       });
     });
 
@@ -164,9 +161,9 @@ describe('DoubaoAPIClient', () => {
       const mockInstance = mockedAxios.create.mock.results[0].value;
       mockInstance.post.mockResolvedValue({
         data: {
-          code: 200,
-          message: 'Success',
-          data: { task_id: 'test-task-id' }
+          data: [
+            { url: 'https://example.com/generated-image.jpg' }
+          ]
         }
       });
 
@@ -288,9 +285,9 @@ describe('DoubaoAPIClient', () => {
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce({
           data: {
-            code: 200,
-            message: 'Success',
-            data: { task_id: 'test-task-id' }
+            data: [
+              { url: 'https://example.com/generated-image.jpg' }
+            ]
           }
         });
 

@@ -12,6 +12,16 @@ jest.mock('../services/templateService');
 jest.mock('fs');
 jest.mock('path');
 
+// Mock process.cwd
+const originalCwd = process.cwd;
+beforeAll(() => {
+  process.cwd = jest.fn().mockReturnValue('/test');
+});
+
+afterAll(() => {
+  process.cwd = originalCwd;
+});
+
 const mockTemplateService = templateService as jest.Mocked<typeof templateService>;
 const mockFs = fs as jest.Mocked<typeof fs>;
 const mockPath = path as jest.Mocked<typeof path>;
@@ -19,6 +29,7 @@ const mockPath = path as jest.Mocked<typeof path>;
 describe('GenerateController Property Tests', () => {
   let mockRequest: Partial<Request>;
   let mockResponse: Partial<Response>;
+  let mockNext: jest.Mock;
   let mockJson: jest.Mock;
   let mockStatus: jest.Mock;
   let mockDoubaoClient: jest.Mocked<DoubaoAPIClient>;
@@ -27,6 +38,7 @@ describe('GenerateController Property Tests', () => {
   beforeEach(() => {
     mockJson = jest.fn();
     mockStatus = jest.fn().mockReturnValue({ json: mockJson });
+    mockNext = jest.fn();
     
     mockRequest = {
       body: {}
@@ -74,8 +86,11 @@ describe('GenerateController Property Tests', () => {
             // Setup mocks for successful path
             mockRequest.body = requestData;
             
-            // Mock image exists
-            mockPath.join.mockReturnValue(`/uploads/${requestData.imageId}.jpg`);
+            // Mock image exists - need to mock all path.join calls
+            mockPath.join
+              .mockReturnValueOnce('/test/uploads') // First call in getImagePath for uploadDir
+              .mockReturnValueOnce(`/test/uploads/${requestData.imageId}.jpg`) // First extension check
+              .mockReturnValue(`/test/uploads/${requestData.imageId}.jpg`); // All other calls
             mockFs.existsSync.mockReturnValue(true);
             mockFs.readFileSync.mockReturnValue(Buffer.from(imageBuffer));
             
@@ -96,7 +111,7 @@ describe('GenerateController Property Tests', () => {
               }
             });
 
-            await controller.generateImage(mockRequest as Request, mockResponse as Response);
+            await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
             // Verify API was called with complete parameters
             expect(mockDoubaoClient.generateImageAndWait).toHaveBeenCalledWith({
@@ -144,8 +159,11 @@ describe('GenerateController Property Tests', () => {
             // Setup request
             mockRequest.body = requestData;
             
-            // Mock image exists
-            mockPath.join.mockReturnValue(`/uploads/${requestData.imageId}.jpg`);
+            // Mock image exists - need to mock all path.join calls
+            mockPath.join
+              .mockReturnValueOnce('/test/uploads') // First call in getImagePath for uploadDir
+              .mockReturnValueOnce(`/test/uploads/${requestData.imageId}.jpg`) // First extension check
+              .mockReturnValue(`/test/uploads/${requestData.imageId}.jpg`); // All other calls
             mockFs.existsSync.mockReturnValue(true);
             mockFs.readFileSync.mockReturnValue(Buffer.from('mock-image-data'));
             
@@ -163,10 +181,9 @@ describe('GenerateController Property Tests', () => {
               data: apiResponse
             });
 
-            await controller.generateImage(mockRequest as Request, mockResponse as Response);
+            await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-            // Verify successful response handling
-            expect(mockStatus).not.toHaveBeenCalledWith(500);
+            // Verify successful response handling - success case doesn't call status()
             expect(mockJson).toHaveBeenCalledWith({
               success: true,
               data: {
@@ -208,8 +225,11 @@ describe('GenerateController Property Tests', () => {
             // Setup request
             mockRequest.body = requestData;
             
-            // Mock image exists
-            mockPath.join.mockReturnValue(`/uploads/${requestData.imageId}.jpg`);
+            // Mock image exists - need to mock all path.join calls
+            mockPath.join
+              .mockReturnValueOnce('/test/uploads') // First call in getImagePath for uploadDir
+              .mockReturnValueOnce(`/test/uploads/${requestData.imageId}.jpg`) // First extension check
+              .mockReturnValue(`/test/uploads/${requestData.imageId}.jpg`); // All other calls
             mockFs.existsSync.mockReturnValue(true);
             mockFs.readFileSync.mockReturnValue(Buffer.from('mock-image-data'));
             
@@ -227,20 +247,16 @@ describe('GenerateController Property Tests', () => {
               error: errorMessage
             });
 
-            await controller.generateImage(mockRequest as Request, mockResponse as Response);
+            await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-            // Verify error response handling
-            expect(mockStatus).toHaveBeenCalledWith(500);
-            expect(mockJson).toHaveBeenCalledWith({
-              success: false,
-              error: errorMessage
-            });
-
-            // Verify the response structure for failures
-            const responseCall = mockJson.mock.calls[0][0];
-            expect(responseCall.success).toBe(false);
-            expect(responseCall.error).toBe(errorMessage);
-            expect(responseCall.data).toBeUndefined();
+            // Verify error is passed to error middleware
+            expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+            const thrownError = mockNext.mock.calls[0][0];
+            expect(thrownError.message).toBe(errorMessage);
+            
+            // Response methods should not be called directly in error case
+            expect(mockStatus).not.toHaveBeenCalled();
+            expect(mockJson).not.toHaveBeenCalled();
           }
         ),
         { numRuns: 100 }
@@ -270,8 +286,11 @@ describe('GenerateController Property Tests', () => {
             // Setup request
             mockRequest.body = requestData;
             
-            // Mock image exists
-            mockPath.join.mockReturnValue(`/uploads/${requestData.imageId}.jpg`);
+            // Mock image exists - need to mock all path.join calls
+            mockPath.join
+              .mockReturnValueOnce('/test/uploads') // First call in getImagePath for uploadDir
+              .mockReturnValueOnce(`/test/uploads/${requestData.imageId}.jpg`) // First extension check
+              .mockReturnValue(`/test/uploads/${requestData.imageId}.jpg`); // All other calls
             mockFs.existsSync.mockReturnValue(true);
             mockFs.readFileSync.mockReturnValue(Buffer.from('mock-image-data'));
             
@@ -298,29 +317,14 @@ describe('GenerateController Property Tests', () => {
             // Mock API throwing error
             mockDoubaoClient.generateImageAndWait.mockRejectedValue(error);
 
-            await controller.generateImage(mockRequest as Request, mockResponse as Response);
+            await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-            // Verify appropriate error handling
-            expect(mockJson).toHaveBeenCalled();
-            const responseCall = mockJson.mock.calls[0][0];
-            expect(responseCall.success).toBe(false);
-            expect(responseCall.error).toBeDefined();
-            expect(typeof responseCall.error).toBe('string');
-
-            // Verify appropriate status codes and error messages for different error types
-            if (errorType === 'timeout' || errorType === 'ETIMEDOUT') {
-              expect(mockStatus).toHaveBeenCalledWith(504);
-              expect(responseCall.error).toBe('请求超时，请稍后重试');
-            } else if (errorType === 'network' || errorType === 'ECONNREFUSED') {
-              expect(mockStatus).toHaveBeenCalledWith(503);
-              expect(responseCall.error).toBe('网络连接失败，请检查网络连接');
-            } else if (errorType === 'DOUBAO_API_KEY') {
-              expect(mockStatus).toHaveBeenCalledWith(500);
-              expect(responseCall.error).toBe('API配置错误，请联系管理员');
-            } else {
-              expect(mockStatus).toHaveBeenCalledWith(500);
-              expect(responseCall.error).toBe(errorType);
-            }
+            // Verify error is passed to error middleware
+            expect(mockNext).toHaveBeenCalledWith(error);
+            
+            // Response methods should not be called directly in error case
+            expect(mockStatus).not.toHaveBeenCalled();
+            expect(mockJson).not.toHaveBeenCalled();
           }
         ),
         { numRuns: 100 }

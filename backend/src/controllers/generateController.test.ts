@@ -18,6 +18,7 @@ const mockPath = path as jest.Mocked<typeof path>;
 describe('GenerateController', () => {
   let mockRequest: Partial<Request>;
   let mockResponse: Partial<Response>;
+  let mockNext: jest.Mock;
   let mockJson: jest.Mock;
   let mockStatus: jest.Mock;
   let mockDoubaoClient: jest.Mocked<DoubaoAPIClient>;
@@ -26,6 +27,7 @@ describe('GenerateController', () => {
   beforeEach(() => {
     mockJson = jest.fn();
     mockStatus = jest.fn().mockReturnValue({ json: mockJson });
+    mockNext = jest.fn();
     
     mockRequest = {
       body: {}
@@ -59,7 +61,7 @@ describe('GenerateController', () => {
         templateId: 'template1'
       };
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(400);
       expect(mockJson).toHaveBeenCalledWith({
@@ -74,7 +76,7 @@ describe('GenerateController', () => {
         templateId: 'template1'
       };
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(400);
       expect(mockJson).toHaveBeenCalledWith({
@@ -89,7 +91,7 @@ describe('GenerateController', () => {
         prompt: 'test prompt'
       };
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(400);
       expect(mockJson).toHaveBeenCalledWith({
@@ -105,7 +107,7 @@ describe('GenerateController', () => {
         templateId: 'template1'
       };
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(400);
       expect(mockJson).toHaveBeenCalledWith({
@@ -125,7 +127,7 @@ describe('GenerateController', () => {
       mockPath.join.mockReturnValue('/uploads/nonexistent.jpg');
       mockFs.existsSync.mockReturnValue(false);
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(404);
       expect(mockJson).toHaveBeenCalledWith({
@@ -148,7 +150,7 @@ describe('GenerateController', () => {
       // Mock template not found
       mockTemplateService.getTemplateById.mockResolvedValue(null);
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(404);
       expect(mockJson).toHaveBeenCalledWith({
@@ -186,7 +188,7 @@ describe('GenerateController', () => {
         }
       });
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockDoubaoClient.generateImageAndWait).toHaveBeenCalledWith({
         referenceImage: Buffer.from('mock-image-data'),
@@ -229,7 +231,7 @@ describe('GenerateController', () => {
         error: 'API调用失败'
       });
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(500);
       expect(mockJson).toHaveBeenCalledWith({
@@ -267,7 +269,7 @@ describe('GenerateController', () => {
         }
       });
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(500);
       expect(mockJson).toHaveBeenCalledWith({
@@ -300,7 +302,7 @@ describe('GenerateController', () => {
       const timeoutError = new Error('Request timeout ETIMEDOUT');
       mockDoubaoClient.generateImageAndWait.mockRejectedValue(timeoutError);
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(504);
       expect(mockJson).toHaveBeenCalledWith({
@@ -333,7 +335,7 @@ describe('GenerateController', () => {
       const networkError = new Error('Network error ECONNREFUSED');
       mockDoubaoClient.generateImageAndWait.mockRejectedValue(networkError);
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(503);
       expect(mockJson).toHaveBeenCalledWith({
@@ -366,7 +368,7 @@ describe('GenerateController', () => {
       const apiKeyError = new Error('DOUBAO_API_KEY not configured');
       mockDoubaoClient.generateImageAndWait.mockRejectedValue(apiKeyError);
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(500);
       expect(mockJson).toHaveBeenCalledWith({
@@ -399,7 +401,7 @@ describe('GenerateController', () => {
       const genericError = new Error('Some unexpected error');
       mockDoubaoClient.generateImageAndWait.mockRejectedValue(genericError);
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(500);
       expect(mockJson).toHaveBeenCalledWith({
@@ -415,7 +417,7 @@ describe('GenerateController', () => {
         templateId: 'template1'
       };
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(400);
       expect(mockJson).toHaveBeenCalledWith({
@@ -431,7 +433,7 @@ describe('GenerateController', () => {
         templateId: 'template1'
       };
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(400);
       expect(mockJson).toHaveBeenCalledWith({
@@ -447,7 +449,7 @@ describe('GenerateController', () => {
         templateId: 123 // number instead of string
       };
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockStatus).toHaveBeenCalledWith(400);
       expect(mockJson).toHaveBeenCalledWith({
@@ -485,7 +487,7 @@ describe('GenerateController', () => {
         }
       });
 
-      await controller.generateImage(mockRequest as Request, mockResponse as Response);
+      await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockDoubaoClient.generateImageAndWait).toHaveBeenCalledWith({
         referenceImage: Buffer.from('mock-image-data'),

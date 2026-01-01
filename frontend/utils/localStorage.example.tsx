@@ -3,6 +3,7 @@
  * This file demonstrates how to integrate the localStorage functions with React components
  */
 
+import React from 'react';
 import { 
   HistoryItem, 
   saveHistoryItem, 
@@ -133,5 +134,4 @@ export function HistoryExample() {
   );
 }
 
-// Note: This example assumes React is imported. In actual usage, you would import React:
-// import React from 'react';
+// Note: This example shows how to use the localStorage utilities with React components

@@ -4,7 +4,10 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { fileService } from '../services/fileService';
+import { imageProcessingService } from '../services/imageProcessingService';
 import { UploadResponse, ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from '../types/upload';
+import { ValidationError, FileError, asyncHandler, handleMulterError } from '../middleware/errorHandler';
+import { logger } from '../utils/logger';
 
 // Configure multer for file upload
 const storage = multer.diskStorage({
@@ -26,13 +29,41 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter for JPG/PNG validation
+// File filter for JPG/PNG validation with enhanced security
 const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  if (ALLOWED_MIME_TYPES.includes(file.mimetype as any)) {
-    cb(null, true);
-  } else {
-    cb(new Error('只支持JPG和PNG格式的图片文件'));
+  // Check MIME type
+  if (!ALLOWED_MIME_TYPES.includes(file.mimetype as any)) {
+    return cb(new FileError('只支持JPG和PNG格式的图片文件', 'INVALID_FILE_TYPE'));
   }
+  
+  // Check file extension
+  const ext = path.extname(file.originalname).toLowerCase();
+  const allowedExtensions = ['.jpg', '.jpeg', '.png'];
+  if (!allowedExtensions.includes(ext)) {
+    return cb(new FileError('文件扩展名与MIME类型不匹配', 'EXTENSION_MISMATCH'));
+  }
+  
+  // Check for suspicious filenames
+  const filename = file.originalname.toLowerCase();
+  const suspiciousPatterns = [
+    /\.php/i, /\.asp/i, /\.jsp/i, /\.exe/i, /\.bat/i, /\.cmd/i,
+    /\.scr/i, /\.vbs/i, /\.js$/i, /\.html/i, /\.htm/i
+  ];
+  
+  for (const pattern of suspiciousPatterns) {
+    if (pattern.test(filename)) {
+      return cb(new FileError('文件名包含不安全的内容', 'SUSPICIOUS_FILENAME'));
+    }
+  }
+  
+  // Log security check
+  logger.info('File filter security check passed', {
+    filename: file.originalname,
+    mimetype: file.mimetype,
+    size: file.size
+  });
+  
+  cb(null, true);
 };
 
 // Configure multer with storage, file filter, and size limits
@@ -45,18 +76,33 @@ export const upload = multer({
 });
 
 // Upload controller function
-export const uploadImage = async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!req.file) {
-      res.status(400).json({
-        success: false,
-        error: '请选择要上传的图片文件'
-      } as UploadResponse);
-      return;
-    }
+export const uploadImage = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  if (!req.file) {
+    throw new ValidationError('请选择要上传的图片文件');
+  }
 
-    const imageId = path.parse(req.file.filename).name; // Remove extension for ID
-    const imageUrl = `/uploads/${req.file.filename}`;
+  const imageId = path.parse(req.file.filename).name; // Remove extension for ID
+  const imageUrl = `/uploads/${req.file.filename}`;
+  const originalPath = req.file.path;
+
+  try {
+    // Optimize the uploaded image (compress and generate thumbnails)
+    const optimization = await imageProcessingService.optimizeUploadedImage(
+      originalPath,
+      req.file.filename
+    );
+
+    // Get image metadata for additional info
+    const metadata = await imageProcessingService.getImageMetadata(originalPath);
+
+    logger.info('Image uploaded and optimized successfully', {
+      imageId,
+      filename: req.file.filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      dimensions: `${metadata.width}x${metadata.height}`,
+      thumbnails: Object.keys(optimization.thumbnails)
+    });
 
     res.json({
       success: true,
@@ -66,53 +112,37 @@ export const uploadImage = async (req: Request, res: Response): Promise<void> =>
         filename: req.file.filename,
         originalName: req.file.originalname,
         size: req.file.size,
-        mimetype: req.file.mimetype
+        mimetype: req.file.mimetype,
+        dimensions: {
+          width: metadata.width,
+          height: metadata.height
+        },
+        thumbnails: optimization.thumbnails,
+        compressed: true
       }
     } as UploadResponse);
-  } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({
-      success: false,
-      error: '图片上传失败'
+  } catch (optimizationError) {
+    // If optimization fails, still return the original upload
+    logger.warn('Image optimization failed, returning original', {
+      error: optimizationError,
+      imageId,
+      filename: req.file.filename
+    });
+
+    res.json({
+      success: true,
+      data: {
+        imageId: imageId,
+        imageUrl: imageUrl,
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+        compressed: false
+      }
     } as UploadResponse);
   }
-};
+});
 
-// Error handler for multer errors
-export const handleUploadError = (error: any, req: Request, res: Response, next: any) => {
-  if (error instanceof multer.MulterError) {
-    if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({
-        success: false,
-        error: '文件大小不能超过10MB'
-      });
-    }
-    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
-      return res.status(400).json({
-        success: false,
-        error: '意外的文件字段'
-      });
-    }
-  }
-  
-  if (error.message === '只支持JPG和PNG格式的图片文件') {
-    return res.status(400).json({
-      success: false,
-      error: error.message
-    });
-  }
-
-  // Handle empty form data or other parsing errors
-  if (error.message && error.message.includes('Unexpected end of form')) {
-    return res.status(400).json({
-      success: false,
-      error: '请选择要上传的图片文件'
-    });
-  }
-
-  console.error('Upload middleware error:', error);
-  res.status(500).json({
-    success: false,
-    error: '文件上传处理失败'
-  });
-};
+// Error handler for multer errors - use the centralized handler
+export { handleMulterError };

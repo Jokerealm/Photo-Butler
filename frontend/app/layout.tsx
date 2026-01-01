@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import ErrorBoundary from "../components/ErrorBoundary";
+import ToastProvider from "../components/Toast";
 
 export const metadata: Metadata = {
   title: "Photo Butler - AI图片生成",
@@ -13,7 +15,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        <ErrorBoundary showDetails={process.env.NODE_ENV === 'development'}>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </ErrorBoundary>
+      </body>
     </html>
   );
 }
