@@ -84,13 +84,17 @@ export class WebSocketService {
       case 'request_task_status':
         // Handle task status request
         if (message.data?.taskId) {
-          this.handleTaskStatusRequest(clientId, message.data.taskId);
+          this.handleTaskStatusRequest(clientId, message.data.taskId).catch(error => {
+            logger.error('Error handling task status request:', error);
+          });
         }
         break;
       
       case 'request_all_tasks_status':
         // Handle all tasks status request
-        this.handleAllTasksStatusRequest(clientId);
+        this.handleAllTasksStatusRequest(clientId).catch(error => {
+          logger.error('Error handling all tasks status request:', error);
+        });
         break;
       
       default:
@@ -102,30 +106,61 @@ export class WebSocketService {
     }
   }
 
-  private handleTaskStatusRequest(clientId: string, taskId: string): void {
-    // This would typically fetch task status from database
-    // For now, send a mock response
-    this.sendToClient(clientId, {
-      type: 'task_status',
-      data: {
-        taskId,
-        status: 'processing',
-        progress: 50,
-        message: 'Task is being processed'
+  private async handleTaskStatusRequest(clientId: string, taskId: string): Promise<void> {
+    try {
+      // Import taskService dynamically to avoid circular dependencies
+      const { taskService } = await import('./taskService');
+      const task = await taskService.getTaskById(taskId);
+      
+      if (task) {
+        this.sendToClient(clientId, {
+          type: 'task_update',
+          data: task
+        });
+      } else {
+        this.sendToClient(clientId, {
+          type: 'error',
+          data: { message: `Task not found: ${taskId}` }
+        });
       }
-    });
+    } catch (error) {
+      logger.error(`Failed to get task status for ${taskId}:`, error);
+      this.sendToClient(clientId, {
+        type: 'error',
+        data: { message: 'Failed to get task status' }
+      });
+    }
   }
 
-  private handleAllTasksStatusRequest(clientId: string): void {
-    // This would typically fetch all tasks for the user
-    // For now, send a mock response
-    this.sendToClient(clientId, {
-      type: 'all_tasks_status',
-      data: {
-        tasks: [],
-        message: 'No active tasks'
-      }
-    });
+  private async handleAllTasksStatusRequest(clientId: string): Promise<void> {
+    try {
+      // Import taskService dynamically to avoid circular dependencies
+      const { taskService } = await import('./taskService');
+      const tasks = await taskService.getAllTasks();
+      
+      // Send individual task updates for each task
+      tasks.forEach(task => {
+        this.sendToClient(clientId, {
+          type: 'task_update',
+          data: task
+        });
+      });
+      
+      // Send completion message
+      this.sendToClient(clientId, {
+        type: 'all_tasks_status_complete',
+        data: { 
+          count: tasks.length,
+          message: `Sent status for ${tasks.length} tasks`
+        }
+      });
+    } catch (error) {
+      logger.error('Failed to get all tasks status:', error);
+      this.sendToClient(clientId, {
+        type: 'error',
+        data: { message: 'Failed to get tasks status' }
+      });
+    }
   }
 
   sendToClient(clientId: string, message: WebSocketMessage): void {

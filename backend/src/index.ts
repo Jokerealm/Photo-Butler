@@ -8,6 +8,9 @@ import uploadRoutes from './routes/uploadRoutes';
 import generateRoutes from './routes/generateRoutes';
 import downloadRoutes from './routes/downloadRoutes';
 import maintenanceRoutes from './routes/maintenanceRoutes';
+import { cleanupService } from './services/cleanupService';
+import storageRoutes from './routes/storageRoutes';
+import taskRoutes from './routes/taskRoutes';
 import { databaseService } from './services/databaseService';
 import { websocketService } from './services/websocketService';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
@@ -45,18 +48,25 @@ app.use(sanitizeInput);
 
 // Static file serving for template images
 const imageDir = path.join(process.cwd(), '..', 'image');
-app.use('/images', express.static(imageDir));
+app.use('/image', express.static(imageDir));
+app.use('/images', express.static(imageDir)); // 添加 /images 路径支持
 
-// Static file serving for uploaded images
-const uploadDir = path.join(process.cwd(), '..', 'uploads');
+// Static file serving for uploaded images (with subdirectories)
+const uploadDir = path.join(process.cwd(), 'uploads');
 app.use('/uploads', express.static(uploadDir));
+
+// Static file serving for downloads
+const downloadDir = path.join(process.cwd(), '..', 'downloads');
+app.use('/downloads', express.static(downloadDir));
 
 // API Routes
 app.use('/api/templates', templateRoutes);
+app.use('/api/tasks', taskRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/generate', generateRoutes);
 app.use('/api/download', downloadRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/storage', storageRoutes);
 
 // Root route
 app.get('/', (_req: Request, res: Response) => {
@@ -67,6 +77,7 @@ app.get('/', (_req: Request, res: Response) => {
     endpoints: {
       health: '/health',
       templates: '/api/templates',
+      tasks: '/api/tasks',
       upload: '/api/upload',
       generate: '/api/generate',
       download: '/api/download',
@@ -114,6 +125,9 @@ async function initializeApp() {
     logger.info(`⚡️[server]: Server is running at http://localhost:${port}`);
     logger.info(`WebSocket server is running at ws://localhost:${port}/ws`);
     logger.info(`Database status: ${databaseService.isAvailable() ? 'Available' : 'Not available (using localStorage only)'}`);
+    
+    // 启动清理服务
+    cleanupService.start();
   });
 }
 

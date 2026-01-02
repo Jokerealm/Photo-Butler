@@ -28,10 +28,10 @@ async function testTemplateService() {
 
     // Test parsePrompts
     console.log('\n3. Testing parsePrompts:');
-    const promptConfig = await templateService.parsePrompts();
-    console.log('Prompts found:', promptConfig.prompts.length);
-    promptConfig.prompts.forEach((prompt, index) => {
-      console.log(`${index + 1}. ${prompt.substring(0, 50)}...`);
+    const promptsMap = await templateService.parsePrompts();
+    console.log('Prompts found:', Object.keys(promptsMap).length);
+    Object.entries(promptsMap).forEach(([name, prompt], index) => {
+      console.log(`${index + 1}. ${name}: ${prompt.substring(0, 50)}...`);
     });
 
     // Test getTemplates

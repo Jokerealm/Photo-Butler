@@ -64,7 +64,8 @@ class ApiService {
     endpoint: string, 
     options: RequestInit = {},
     cacheKey?: string,
-    cacheTTL?: number
+    cacheTTL?: number,
+    timeoutMs?: number
   ): Promise<ApiResponse<T>> {
     // Check cache first for GET requests
     if (cacheKey && (!options.method || options.method === 'GET')) {
@@ -76,13 +77,26 @@ class ApiService {
 
     const url = `${API_BASE_URL}${endpoint}`;
     
+    // 检查是否是FormData，如果是则不设置Content-Type
+    const isFormData = options.body instanceof FormData;
+    
+    // 根据请求类型设置不同的超时时间
+    const defaultTimeout = timeoutMs || (
+      endpoint.includes('/generate') || endpoint.includes('/tasks') ? 180000 : // 生成和任务相关API：3分钟
+      endpoint.includes('/upload') ? 60000 : // 上传API：1分钟
+      30000 // 其他API：30秒
+    );
+    
     const defaultOptions: RequestInit = {
-      headers: {
+      headers: isFormData ? {
+        // 对于FormData，不设置Content-Type，让浏览器自动设置
+        ...options.headers,
+      } : {
         'Content-Type': 'application/json',
         ...options.headers,
       },
       // Add timeout
-      signal: AbortSignal.timeout(30000), // 30 second timeout
+      signal: AbortSignal.timeout(defaultTimeout),
     };
 
     try {
@@ -104,7 +118,18 @@ class ApiService {
         throw this.createApiError(errorMessage, response.status, errorDetails);
       }
 
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (jsonError) {
+        // JSON解析错误，可能是服务器返回了非JSON响应
+        const responseText = await response.text().catch(() => 'Unable to read response');
+        throw this.createApiError(
+          `服务器返回了无效的JSON响应: ${jsonError.message}. 响应内容: ${responseText.substring(0, 100)}...`, 
+          response.status, 
+          { originalError: jsonError, responseText }
+        );
+      }
 
       // Cache successful GET responses
       if (cacheKey && (!options.method || options.method === 'GET')) {
@@ -129,10 +154,11 @@ class ApiService {
     endpoint: string,
     options: RequestInit = {},
     cacheKey?: string,
-    cacheTTL?: number
+    cacheTTL?: number,
+    timeoutMs?: number
   ): Promise<ApiResponse<T>> {
     return RetryService.withRetry(
-      () => this.request<T>(endpoint, options, cacheKey, cacheTTL),
+      () => this.request<T>(endpoint, options, cacheKey, cacheTTL, timeoutMs),
       {
         maxAttempts: 3,
         baseDelay: 1000,
@@ -183,10 +209,15 @@ class ApiService {
   }
 
   // Task API methods (no caching for dynamic data)
-  async createTask(templateId: string, imageFile: File): Promise<ApiResponse<{ task: GenerationTask }>> {
+  async createTask(templateId: string, imageFile: File, customPrompt?: string): Promise<ApiResponse<{ task: GenerationTask }>> {
     const formData = new FormData();
     formData.append('templateId', templateId);
     formData.append('imageFile', imageFile);
+    
+    // 如果提供了自定义提示词，添加到表单数据中
+    if (customPrompt) {
+      formData.append('customPrompt', customPrompt);
+    }
 
     // Clear task list cache when creating new task
     this.clearTaskCache();
@@ -195,7 +226,7 @@ class ApiService {
     return this.request<{ task: GenerationTask }>('/api/tasks', {
       method: 'POST',
       body: formData,
-      headers: {}, // Remove Content-Type to let browser set it for FormData
+      // 不设置headers，让request方法自动处理FormData
     });
   }
 
@@ -272,8 +303,19 @@ class ApiService {
   // File download helper with error handling
   async downloadFile(url: string, filename: string): Promise<void> {
     try {
+      // Handle relative URLs by making them absolute
+      let downloadUrl = url;
+      if (url.startsWith('/')) {
+        downloadUrl = `${API_BASE_URL}${url}`;
+      }
+
       const response = await RetryService.withRetry(
-        () => fetch(url),
+        () => fetch(downloadUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'image/*,*/*'
+          }
+        }),
         {
           maxAttempts: 3,
           baseDelay: 1000,
@@ -288,10 +330,16 @@ class ApiService {
       }
 
       const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
+      
+      // Check if we actually got an image
+      if (!blob.type.startsWith('image/')) {
+        throw new Error('下载的文件不是有效的图片格式');
+      }
+
+      const objectUrl = window.URL.createObjectURL(blob);
       
       const a = document.createElement('a');
-      a.href = downloadUrl;
+      a.href = objectUrl;
       a.download = filename;
       a.style.display = 'none';
       document.body.appendChild(a);
@@ -299,12 +347,12 @@ class ApiService {
       
       // Cleanup
       setTimeout(() => {
-        window.URL.revokeObjectURL(downloadUrl);
+        window.URL.revokeObjectURL(objectUrl);
         document.body.removeChild(a);
       }, 100);
     } catch (error) {
       console.error('File download failed:', error);
-      throw new Error(`文件下载失败: ${error.message}`);
+      throw new Error(`文件下载失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   }
 

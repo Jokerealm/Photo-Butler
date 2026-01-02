@@ -25,7 +25,7 @@ interface TaskStore {
   
   // Task operations
   loadTasks: () => Promise<void>;
-  createTask: (templateId: string, imageFile: File) => Promise<GenerationTask>;
+  createTask: (templateId: string, imageFile: File, customPrompt?: string) => Promise<GenerationTask>;
   retryTask: (taskId: string) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
   
@@ -92,9 +92,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }
   },
 
-  createTask: async (templateId: string, imageFile: File) => {
+  createTask: async (templateId: string, imageFile: File, customPrompt?: string) => {
     try {
-      const response = await apiService.createTask(templateId, imageFile);
+      const response = await apiService.createTask(templateId, imageFile, customPrompt);
       if (response.success) {
         const task = response.data.task;
         get().addTask(task);
@@ -160,11 +160,20 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         const elapsedMs = now.getTime() - startTime.getTime();
         const progressRate = task.progress / 100;
         
-        if (progressRate > 0) {
+        if (progressRate > 0.05) { // Only calculate if we have meaningful progress
           const totalEstimatedMs = elapsedMs / progressRate;
           const remainingMs = totalEstimatedMs - elapsedMs;
-          task.estimatedCompletionTime = new Date(now.getTime() + remainingMs);
+          
+          // Only set estimated time if it's reasonable (not more than 1 hour)
+          if (remainingMs > 0 && remainingMs < 3600000) {
+            task.estimatedCompletionTime = new Date(now.getTime() + remainingMs);
+          }
         }
+      }
+      
+      // Clear estimated completion time if task is no longer processing
+      if (task.status !== TaskStatus.PROCESSING) {
+        task.estimatedCompletionTime = undefined;
       }
       
       // Update task with real-time data
@@ -209,13 +218,13 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     wsService.on('task-complete', handleTaskComplete);
     wsService.on('task-failed', handleTaskFailed);
     
-    // Connect to WebSocket
+    // Connect to WebSocket (non-blocking)
     wsService.connect().then(() => {
       // Request status updates for all tasks when connected
       wsService.requestAllTasksStatus();
     }).catch(error => {
-      console.error('Failed to connect to WebSocket:', error);
-      set({ error: 'Failed to connect to real-time updates' });
+      console.warn('WebSocket connection failed:', error.message);
+      // Don't set error state, just log the warning
     });
   },
 

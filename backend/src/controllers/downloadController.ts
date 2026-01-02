@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import axios from 'axios';
+import { downloadService } from '../services/downloadService';
+import fs from 'fs';
 import path from 'path';
-import { templateService } from '../services/templateService';
 
 /**
  * Download controller
@@ -22,119 +22,74 @@ interface DownloadQuery {
  * 下载生成的图片
  * Download generated image
  * 
- * GET /api/download/:imageId?url=<imageUrl>&template=<templateName>&timestamp=<timestamp>
+ * GET /api/download/:taskId
  */
 export const downloadImage = async (req: Request, res: Response): Promise<void> => {
   try {
-    const imageId = req.params.imageId;
-    const { url, template, timestamp } = req.query as DownloadQuery;
-
-    console.log(`Download request - ImageID: ${imageId}, URL: ${url}, Template: ${template}, Timestamp: ${timestamp}`);
+    const taskId = req.params.imageId; // 保持兼容性，实际上是taskId
+    
+    console.log(`[DownloadController] Download request for task: ${taskId}`);
 
     // 参数验证
-    if (!imageId || typeof imageId !== 'string') {
-      console.warn('Invalid imageId parameter:', imageId);
+    if (!taskId || typeof taskId !== 'string') {
+      console.warn('[DownloadController] Invalid taskId parameter:', taskId);
       res.status(400).json({
         success: false,
-        error: '缺少有效的图片ID参数'
+        error: '缺少有效的任务ID参数'
       });
       return;
     }
 
-    if (!url || typeof url !== 'string') {
-      console.warn('Invalid url parameter:', url);
-      res.status(400).json({
-        success: false,
-        error: '缺少有效的图片URL参数'
-      });
-      return;
-    }
-
-    // 验证URL格式
-    let imageUrl: URL;
-    try {
-      imageUrl = new URL(url);
-    } catch (error) {
-      console.warn('Invalid URL format:', url);
-      res.status(400).json({
-        success: false,
-        error: '无效的图片URL格式'
-      });
-      return;
-    }
-
-    console.log(`Fetching image from URL: ${imageUrl.toString()}`);
-
-    // 从URL获取图片数据
-    const imageResponse = await axios.get(imageUrl.toString(), {
-      responseType: 'arraybuffer',
-      timeout: 30000, // 30秒超时
-      headers: {
-        'User-Agent': 'PhotoButler/1.0'
-      }
-    });
-
-    if (!imageResponse.data) {
-      console.error('No image data received from URL');
+    // 使用下载服务准备文件
+    const downloadInfo = await downloadService.prepareDownload(taskId);
+    
+    // 检查文件是否存在
+    if (!fs.existsSync(downloadInfo.filePath)) {
+      console.error('[DownloadController] Download file not found:', downloadInfo.filePath);
       res.status(404).json({
         success: false,
-        error: '无法获取图片数据'
+        error: '下载文件不存在或已过期'
       });
       return;
     }
 
-    // 获取图片的Content-Type
-    const contentType = imageResponse.headers['content-type'] || 'image/jpeg';
-    console.log(`Image content type: ${contentType}`);
-
-    // 确定文件扩展名
-    let extension = '.jpg';
-    if (contentType.includes('png')) {
-      extension = '.png';
-    } else if (contentType.includes('jpeg') || contentType.includes('jpg')) {
-      extension = '.jpg';
-    } else if (contentType.includes('webp')) {
-      extension = '.webp';
-    }
-
-    // 生成下载文件名
-    const filename = generateDownloadFilename(template, timestamp, extension);
-    console.log(`Generated filename: ${filename}`);
+    // 读取文件
+    const imageData = fs.readFileSync(downloadInfo.filePath);
+    
+    console.log(`[DownloadController] Serving download: ${downloadInfo.filename}`);
 
     // 设置响应头
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Length', imageResponse.data.length);
+    res.setHeader('Content-Type', downloadInfo.mimeType);
+    
+    // 对文件名进行编码以支持中文字符
+    const encodedFilename = encodeURIComponent(downloadInfo.filename);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
+    
+    res.setHeader('Content-Length', imageData.length);
     res.setHeader('Cache-Control', 'no-cache');
 
     // 发送图片数据
-    res.send(Buffer.from(imageResponse.data));
+    res.send(imageData);
 
-    console.log(`Image download completed successfully: ${filename}`);
+    console.log(`[DownloadController] Download completed: ${downloadInfo.filename}`);
 
   } catch (error) {
-    console.error('Error in downloadImage:', error);
+    console.error('[DownloadController] Error in downloadImage:', error);
 
     // 处理不同类型的错误
     let errorMessage = '图片下载失败';
     let statusCode = 500;
 
-    if (axios.isAxiosError(error)) {
-      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        errorMessage = '图片下载超时，请稍后重试';
-        statusCode = 504;
-      } else if (error.response?.status === 404) {
-        errorMessage = '图片不存在或已过期';
+    if (error instanceof Error) {
+      if (error.message.includes('not found')) {
+        errorMessage = '任务不存在或图片未生成';
         statusCode = 404;
-      } else if (error.response?.status === 403) {
-        errorMessage = '无权限访问该图片';
-        statusCode = 403;
+      } else if (error.message.includes('No generated image')) {
+        errorMessage = '图片尚未生成完成，请稍后重试';
+        statusCode = 400;
       } else {
-        errorMessage = '无法访问图片资源';
-        statusCode = 502;
+        errorMessage = error.message;
       }
-    } else if (error instanceof Error) {
-      errorMessage = error.message;
     }
 
     res.status(statusCode).json({

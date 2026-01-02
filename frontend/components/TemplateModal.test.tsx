@@ -8,6 +8,18 @@ import { apiService } from '../services/apiService';
 // Mock apiService
 jest.mock('../services/apiService');
 
+// Mock Next.js router
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+    back: jest.fn(),
+    forward: jest.fn(),
+    refresh: jest.fn(),
+  }),
+}));
+
 // Mock ImageUploader component
 jest.mock('./ImageUploader', () => {
   return function MockImageUploader({ onImageUpload, acceptedFormats }: any) {
@@ -231,13 +243,14 @@ describe('TemplateModal', () => {
       await user.click(submitButton);
       
       await waitFor(() => {
-        expect(screen.getByText('任务提交成功！')).toBeInTheDocument();
+        expect(screen.getByText('任务已添加到后台进行生成')).toBeInTheDocument();
         expect(screen.getByText('任务ID: task_123')).toBeInTheDocument();
       });
       
       expect(mockApiService.createTask).toHaveBeenCalledWith(
         'template_1',
-        expect.any(File)
+        expect.any(File),
+        undefined
       );
       expect(mockOnTaskSubmit).toHaveBeenCalledWith(mockTask);
     });
@@ -413,10 +426,9 @@ describe('TemplateModal', () => {
     });
   });
 
-  describe('确认消息 (Confirmation Message)', () => {
-    it('should auto-hide confirmation message after 3 seconds', async () => {
-      jest.useFakeTimers();
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+  describe('确认模态框 (Confirmation Modal)', () => {
+    it('should show confirmation modal with action buttons', async () => {
+      const user = userEvent.setup();
       
       render(<TemplateModal {...defaultProps} />);
       
@@ -428,19 +440,74 @@ describe('TemplateModal', () => {
       await user.click(submitButton);
       
       await waitFor(() => {
-        expect(screen.getByText('任务提交成功！')).toBeInTheDocument();
+        expect(screen.getByText('任务已添加到后台进行生成')).toBeInTheDocument();
       });
       
-      // Fast-forward time using act to avoid warnings
-      await act(async () => {
-        jest.advanceTimersByTime(3000);
-      });
+      // Check for action buttons
+      expect(screen.getByText('继续生成')).toBeInTheDocument();
+      expect(screen.getByText('去查看')).toBeInTheDocument();
+    });
+
+    it('should handle "继续生成" button click', async () => {
+      const user = userEvent.setup();
+      
+      render(<TemplateModal {...defaultProps} />);
+      
+      // Upload and submit
+      const uploadButton = screen.getByText('Upload Image');
+      await user.click(uploadButton);
+      
+      const submitButton = screen.getByRole('button', { name: /开始生成/ });
+      await user.click(submitButton);
       
       await waitFor(() => {
-        expect(screen.queryByText('任务提交成功！')).not.toBeInTheDocument();
+        expect(screen.getByText('任务已添加到后台进行生成')).toBeInTheDocument();
       });
       
-      jest.useRealTimers();
+      // Click "继续生成"
+      const continueButton = screen.getByText('继续生成');
+      await user.click(continueButton);
+      
+      // Modal should close and form should reset
+      expect(screen.queryByText('任务已添加到后台进行生成')).not.toBeInTheDocument();
+      expect(screen.queryByText('图片上传成功')).not.toBeInTheDocument();
+    });
+
+    it('should handle "去查看" button click and navigate to workspace', async () => {
+      const user = userEvent.setup();
+      const mockPush = jest.fn();
+      
+      // Mock useRouter to capture navigation
+      jest.doMock('next/navigation', () => ({
+        useRouter: () => ({
+          push: mockPush,
+          replace: jest.fn(),
+          prefetch: jest.fn(),
+          back: jest.fn(),
+          forward: jest.fn(),
+          refresh: jest.fn(),
+        }),
+      }));
+      
+      render(<TemplateModal {...defaultProps} />);
+      
+      // Upload and submit
+      const uploadButton = screen.getByText('Upload Image');
+      await user.click(uploadButton);
+      
+      const submitButton = screen.getByRole('button', { name: /开始生成/ });
+      await user.click(submitButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText('任务已添加到后台进行生成')).toBeInTheDocument();
+      });
+      
+      // Click "去查看"
+      const viewButton = screen.getByText('去查看');
+      await user.click(viewButton);
+      
+      // Should close modal and call onClose
+      expect(mockOnClose).toHaveBeenCalled();
     });
   });
 });

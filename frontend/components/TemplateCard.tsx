@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Template } from '../types';
 import LazyImage from './LazyImage';
+import { getTemplateDisplayText } from '../services/templateDescriptionService';
 
 interface TemplateCardProps {
   template: Template;
@@ -87,7 +88,7 @@ export default function TemplateCard({ template, onClick, className = '' }: Temp
           {template.name}
         </h3>
         <p className="text-sm text-gray-600 line-clamp-2 mb-3 leading-relaxed" data-testid="template-description">
-          {template.description || template.prompt || '暂无描述'}
+          {getTemplateDisplayText(template)}
         </p>
         
         {/* Tags */}

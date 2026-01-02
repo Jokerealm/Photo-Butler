@@ -98,35 +98,37 @@ export class TemplateService {
    * 从prompt.txt解析提示词
    * Parse prompts from prompt.txt file
    * 
-   * @returns 提示词配置
+   * @returns 提示词配置（按名称索引）
    */
-  async parsePrompts(): Promise<TemplateConfig> {
+  async parsePrompts(): Promise<{ [key: string]: string }> {
     try {
       if (!fs.existsSync(this.promptFile)) {
         console.warn(`Prompt file not found: ${this.promptFile}`);
-        return { prompts: [] };
+        return {};
       }
 
       const content = await fs.promises.readFile(this.promptFile, 'utf-8');
       const lines = content.split('\n');
-      const prompts: string[] = [];
+      const prompts: { [key: string]: string } = {};
 
       for (const line of lines) {
         const trimmedLine = line.trim();
         if (trimmedLine && !trimmedLine.startsWith('#')) {
-          // 解析格式：数字. 提示词内容
-          const match = trimmedLine.match(/^\d+\.\s*(.+)$/);
+          // 解析格式：数字. 名称：提示词内容 (支持中文和英文冒号)
+          const match = trimmedLine.match(/^\d+\.\s*([^：:]+)[：:]\s*(.+)$/);
           if (match) {
-            prompts.push(match[1].trim());
+            const name = match[1].trim();
+            const prompt = match[2].trim();
+            prompts[name] = prompt;
           }
         }
       }
 
-      console.log(`Loaded ${prompts.length} prompts from prompt.txt`);
-      return { prompts };
+      console.log(`Loaded ${Object.keys(prompts).length} prompts from prompt.txt`);
+      return prompts;
     } catch (error) {
       console.error('Error parsing prompts:', error);
-      return { prompts: [] };
+      return {};
     }
   }
 
@@ -138,7 +140,7 @@ export class TemplateService {
    */
   async getTemplates(): Promise<Template[]> {
     try {
-      const [templateFiles, promptConfig] = await Promise.all([
+      const [templateFiles, promptsMap] = await Promise.all([
         this.readTemplateFiles(),
         this.parsePrompts()
       ]);
@@ -147,7 +149,8 @@ export class TemplateService {
 
       for (let i = 0; i < templateFiles.length; i++) {
         const file = templateFiles[i];
-        const prompt = promptConfig.prompts[i] || ''; // 按索引匹配提示词
+        // 按名称匹配提示词
+        const prompt = promptsMap[file.name] || '';
 
         // 生成预览图URL（相对于静态文件服务）
         const previewUrl = await this.getPreviewUrl(file.filename);
@@ -172,7 +175,7 @@ export class TemplateService {
    * Get preview URL, return default placeholder if file doesn't exist
    * 
    * @param filename - 文件名
-   * @returns 预览图URL
+   * @returns 预览图URL（已编码）
    */
   private async getPreviewUrl(filename: string): Promise<string> {
     try {
@@ -180,7 +183,9 @@ export class TemplateService {
       
       // 检查文件是否存在
       if (fs.existsSync(filePath)) {
-        return `/images/${filename}`;
+        // 对中文文件名进行URL编码
+        const encodedFilename = encodeURIComponent(filename);
+        return `/images/${encodedFilename}`;
       } else {
         console.warn(`Template preview image not found: ${filename}, using placeholder`);
         return '/images/placeholder.png'; // 默认占位图

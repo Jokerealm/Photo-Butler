@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import LazyImage from './LazyImage';
 import VirtualList from './VirtualList';
+import { createEmptyTemplate, isEmptyTemplate } from '../utils/templateUtils';
+import { ensureTemplateDescriptions, sortTemplatesByDisplayQuality } from '../utils/templateDescriptionUtils';
 
 // Template interface matching the backend type
 interface Template {
@@ -36,6 +38,9 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Create empty template as default first option using shared utility
+  const emptyTemplate = createEmptyTemplate();
+
   // Fetch templates from API with memoization
   const fetchTemplates = useCallback(async () => {
     try {
@@ -46,8 +51,11 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
       const data: TemplateListResponse = await response.json();
 
       if (data.success) {
-        setTemplates(data.data.templates);
-        console.log(`Loaded ${data.data.templates.length} templates`);
+        // Ensure all templates have descriptions and sort by display quality
+        const templatesWithDescriptions = ensureTemplateDescriptions(data.data.templates);
+        const sortedTemplates = sortTemplatesByDisplayQuality(templatesWithDescriptions);
+        setTemplates(sortedTemplates);
+        console.log(`Loaded ${sortedTemplates.length} templates with descriptions`);
       } else {
         setError(data.error || '获取模板列表失败');
       }
@@ -88,8 +96,12 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
 
   // Memoize template rendering for performance
   const templateItems = useMemo(() => {
-    return templates.map((template) => {
+    // Combine empty template with fetched templates, ensuring empty template is first
+    const allTemplates = [emptyTemplate, ...templates];
+    
+    return allTemplates.map((template) => {
       const isSelected = selectedTemplate?.id === template.id;
+      const isEmptyTemplateCheck = isEmptyTemplate(template);
       
       return (
         <div
@@ -104,6 +116,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
               ? 'border-blue-500 ring-2 ring-blue-200 shadow-lg' 
               : 'border-gray-200 hover:border-gray-300'
             }
+            ${isEmptyTemplateCheck ? 'border-dashed border-blue-300 bg-blue-50/30' : ''}
           `}
           onClick={() => handleTemplateClick(template)}
           data-testid={`template-${template.id}`}
@@ -119,15 +132,28 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
         >
           {/* Template Preview Image with Lazy Loading */}
           <div className="w-full bg-gray-100 relative overflow-hidden" style={{ aspectRatio: '340/240' }}>
-            <LazyImage
-              src={template.previewUrl}
-              alt={`${template.name} 预览`}
-              className="w-full h-full"
-              onError={handleImageError}
-              loading="lazy"
-              threshold={0.1}
-              rootMargin="100px"
-            />
+            {isEmptyTemplateCheck ? (
+              // Special rendering for empty template
+              <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-dashed border-blue-300">
+                <div className="text-center">
+                  <svg className="w-12 h-12 mx-auto mb-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                  </svg>
+                  <p className="text-sm font-medium text-blue-600 mb-1">空白画布</p>
+                  <p className="text-xs text-blue-500">自由创作</p>
+                </div>
+              </div>
+            ) : (
+              <LazyImage
+                src={template.previewUrl}
+                alt={`${template.name} 预览`}
+                className="w-full h-full"
+                onError={handleImageError}
+                loading="lazy"
+                threshold={0.1}
+                rootMargin="100px"
+              />
+            )}
             
             {/* Selection Indicator */}
             {isSelected && (
@@ -137,6 +163,15 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                 </svg>
               </div>
             )}
+
+            {/* Empty template badge */}
+            {isEmptyTemplateCheck && (
+              <div className="absolute top-2 left-2">
+                <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                  默认
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Template Name */}
@@ -144,9 +179,15 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
             <h3 className={`
               text-xs sm:text-sm font-medium text-center truncate leading-tight
               ${isSelected ? 'text-blue-600' : 'text-gray-900'}
+              ${isEmptyTemplateCheck ? 'font-semibold' : ''}
             `}>
               {template.name}
             </h3>
+            {isEmptyTemplateCheck && (
+              <p className="text-xs text-gray-500 text-center mt-1">
+                {template.description}
+              </p>
+            )}
           </div>
 
           {/* Hover Overlay */}
@@ -156,7 +197,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
         </div>
       );
     });
-  }, [templates, selectedTemplate, disabled, handleTemplateClick, handleImageError]);
+  }, [templates, selectedTemplate, disabled, handleTemplateClick, handleImageError, emptyTemplate]);
 
   if (loading) {
     return (
@@ -211,7 +252,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
       {/* Use virtual scrolling for large template lists */}
       {templates.length > 50 ? (
         <VirtualList
-          items={templates}
+          items={[emptyTemplate, ...templates]}
           itemHeight={200} // Approximate height of template card
           containerHeight={600} // Fixed container height
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"

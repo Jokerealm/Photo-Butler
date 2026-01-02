@@ -85,7 +85,7 @@ describe('Download Controller', () => {
 
       mockRequest.params = { imageId: 'test-id' };
       mockRequest.query = {
-        url: 'https://example.com/image.jpg',
+        url: 'https://example.com/image.jpg', // 外部URL
         template: '油画风格',
         timestamp: '1640995200000'
       };
@@ -104,7 +104,7 @@ describe('Download Controller', () => {
       );
 
       expect(mockSetHeader).toHaveBeenCalledWith('Content-Type', 'image/jpeg');
-      expect(mockSetHeader).toHaveBeenCalledWith('Content-Disposition', expect.stringContaining('attachment; filename='));
+      expect(mockSetHeader).toHaveBeenCalledWith('Content-Disposition', expect.stringMatching(/^attachment; filename\*=UTF-8''/));
       expect(mockSetHeader).toHaveBeenCalledWith('Content-Length', mockImageData.length);
       expect(mockSetHeader).toHaveBeenCalledWith('Cache-Control', 'no-cache');
       expect(mockSend).toHaveBeenCalledWith(mockImageData);
@@ -119,7 +119,7 @@ describe('Download Controller', () => {
       mockedAxios.isAxiosError.mockReturnValue(true);
 
       mockRequest.params = { imageId: 'test-id' };
-      mockRequest.query = { url: 'https://example.com/image.jpg' };
+      mockRequest.query = { url: 'https://example.com/timeout.jpg' }; // 使用外部URL
 
       await downloadImage(mockRequest as Request, mockResponse as Response);
 
@@ -140,7 +140,7 @@ describe('Download Controller', () => {
       mockedAxios.isAxiosError.mockReturnValue(true);
 
       mockRequest.params = { imageId: 'test-id' };
-      mockRequest.query = { url: 'https://example.com/image.jpg' };
+      mockRequest.query = { url: 'https://example.com/nonexistent.jpg' };
 
       await downloadImage(mockRequest as Request, mockResponse as Response);
 
@@ -149,6 +149,30 @@ describe('Download Controller', () => {
         success: false,
         error: '图片不存在或已过期'
       });
+    });
+
+    it('should handle local file downloads', async () => {
+      // Mock fs.existsSync and fs.readFileSync for local file handling
+      const fs = require('fs');
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readFileSync').mockReturnValue(Buffer.from('local-file-data'));
+
+      mockRequest.params = { imageId: 'test-id' };
+      mockRequest.query = {
+        url: 'http://localhost:3001/uploads/test-file.jpg',
+        template: '测试模板',
+        timestamp: '1640995200000'
+      };
+
+      await downloadImage(mockRequest as Request, mockResponse as Response);
+
+      expect(fs.existsSync).toHaveBeenCalled();
+      expect(fs.readFileSync).toHaveBeenCalled();
+      expect(mockSetHeader).toHaveBeenCalledWith('Content-Type', 'image/jpeg');
+      expect(mockSend).toHaveBeenCalledWith(Buffer.from('local-file-data'));
+
+      // Cleanup mocks
+      jest.restoreAllMocks();
     });
   });
 

@@ -5,6 +5,8 @@ import { useTemplateStore } from '../stores/templateStore';
 import { useUIStore } from '../stores/uiStore';
 import { apiService } from '../services/apiService';
 import { Template } from '../types';
+import { combineWithEmptyTemplate } from '../utils/templateUtils';
+import { ensureTemplateDescriptions, sortTemplatesByDisplayQuality } from '../utils/templateDescriptionUtils';
 import TemplateCard from '../components/TemplateCard';
 import SearchBar from '../components/SearchBar';
 import TemplateModal from '../components/TemplateModal';
@@ -44,7 +46,13 @@ const TemplateMarketplace: React.FC<TemplateMarketplaceProps> = ({
     try {
       const response = await apiService.getTemplates();
       if (response.success) {
-        setTemplates(response.data.templates);
+        // Ensure all templates have descriptions and sort by display quality
+        const templatesWithDescriptions = ensureTemplateDescriptions(response.data.templates);
+        const sortedTemplates = sortTemplatesByDisplayQuality(templatesWithDescriptions);
+        
+        // Use utility function to combine empty template with fetched templates
+        const allTemplates = combineWithEmptyTemplate(sortedTemplates);
+        setTemplates(allTemplates);
       } else {
         throw new Error(response.error || '获取模板失败');
       }
@@ -68,7 +76,8 @@ const TemplateMarketplace: React.FC<TemplateMarketplaceProps> = ({
 
   const handleTaskSubmit = (task: any) => {
     showToast(`生成任务已提交 (ID: ${task.id})`, 'success');
-    closeModal();
+    // 不要立即关闭模态框，让TemplateModal内部的确认弹窗显示
+    // closeModal(); // 移除这行，让TemplateModal自己处理关闭逻辑
   };
 
   if (loading) {

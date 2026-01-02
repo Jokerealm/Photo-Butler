@@ -68,9 +68,9 @@ export class WebSocketService {
         };
 
         this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
+          console.error('WebSocket error:', error || 'Unknown WebSocket error');
           this.setConnectionState(ConnectionState.ERROR);
-          reject(error);
+          reject(new Error('WebSocket connection failed'));
         };
       } catch (error) {
         this.setConnectionState(ConnectionState.ERROR);
@@ -259,6 +259,11 @@ export const getWebSocketService = (): WebSocketService => {
   if (!wsService) {
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws';
     wsService = new WebSocketService(wsUrl);
+    
+    // 尝试连接，但不阻塞应用启动
+    wsService.connect().catch(error => {
+      console.warn('WebSocket connection failed, continuing without real-time updates:', error.message);
+    });
   }
   return wsService;
 };

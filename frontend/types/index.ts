@@ -1,5 +1,9 @@
 // Core data types and interfaces for the e-commerce redesign
 
+// Re-export prompt template types
+export * from './promptTemplate'
+export * from './promptTemplateErrors'
+
 // Template interface - represents an AI art style template
 export interface Template {
   id: string;

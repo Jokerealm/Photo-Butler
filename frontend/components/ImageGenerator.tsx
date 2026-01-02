@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import { apiService } from '../services/apiService';
 
 // Types for the component
 interface Template {
@@ -121,49 +122,62 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     try {
       console.log('Starting image generation process...');
       
-      // Step 1: Upload reference image (10% progress)
+      // 使用新的任务API直接创建任务
       setProgress(10);
-      const imageId = await uploadImage(referenceImage!);
       
-      if (!imageId) {
-        throw new Error('图片上传失败，无法获取图片ID');
+      // 使用编辑后的提示词，如果与原始提示词不同，则作为自定义提示词传递
+      const customPrompt = prompt !== selectedTemplate!.prompt ? prompt : undefined;
+      
+      console.log('Creating task with API...');
+      const response = await apiService.createTask(selectedTemplate!.id, referenceImage!, customPrompt);
+
+      if (!response.success) {
+        throw new Error(response.error || '任务创建失败');
       }
 
-      // Step 2: Call generation API (30% progress)
+      const task = response.data.task;
+      setGenerationId(task.id);
+      
+      // 模拟进度更新（在实际实现中，这会通过WebSocket或轮询获取）
       setProgress(30);
-      console.log('Calling generation API...');
       
-      const generateResult = await callGenerateAPI(imageId, prompt, selectedTemplate!.id);
-
-      if (!generateResult.success) {
-        throw new Error(generateResult.error || '图片生成失败');
-      }
-
-      if (!generateResult.data?.generatedImageUrl) {
-        throw new Error('生成失败：未返回图片URL');
-      }
-
-      // Step 3: Generation complete (100% progress)
-      setProgress(100);
-      const generatedImageUrl = generateResult.data.generatedImageUrl;
-      const genId = generateResult.data.generationId;
+      // 等待任务完成（简化版本，实际应该通过WebSocket监听）
+      let attempts = 0;
+      const maxAttempts = 120; // 最多等待120秒（2分钟）
       
-      setGeneratedImage(generatedImageUrl);
-      setGenerationId(genId);
-
-      console.log('Image generation completed successfully');
-
-      // Prepare result for parent component
-      const result: GenerationResult = {
-        imageUrl: generatedImageUrl,
-        timestamp: Date.now(),
-        template: selectedTemplate!.name,
-        prompt: prompt,
-        generationId: genId
-      };
-
-      // Notify parent component
-      onGenerationComplete(result);
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // 等待1秒
+        attempts++;
+        
+        // 获取任务状态
+        const taskResponse = await apiService.getTask(task.id);
+        if (taskResponse.success && taskResponse.data.task) {
+          const updatedTask = taskResponse.data.task;
+          setProgress(Math.min(90, 30 + (attempts * 0.5))); // 更平滑的进度更新
+          
+          if (updatedTask.status === 'completed' && updatedTask.generatedImageUrl) {
+            setProgress(100);
+            setGeneratedImage(updatedTask.generatedImageUrl);
+            
+            // 准备结果给父组件
+            const result: GenerationResult = {
+              imageUrl: updatedTask.generatedImageUrl,
+              timestamp: Date.now(),
+              template: selectedTemplate!.name,
+              prompt: prompt,
+              generationId: updatedTask.id
+            };
+            
+            onGenerationComplete(result);
+            console.log('Image generation completed successfully');
+            return;
+          } else if (updatedTask.status === 'failed') {
+            throw new Error(updatedTask.errorMessage || '图片生成失败');
+          }
+        }
+      }
+      
+      throw new Error('图片生成时间较长，请稍后查看任务状态或重试');
 
     } catch (err) {
       console.error('Generation error:', err);
@@ -173,7 +187,7 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
       setIsGenerating(false);
       setProgress(0);
     }
-  }, [canGenerate, referenceImage, prompt, selectedTemplate, uploadImage, callGenerateAPI, onGenerationComplete]);
+  }, [canGenerate, referenceImage, prompt, selectedTemplate, onGenerationComplete]);
 
   // Cancel generation (for future implementation)
   const cancelGeneration = useCallback(() => {
@@ -429,10 +443,11 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
         <div className="p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <h4 className="text-xs sm:text-sm font-medium text-blue-900 mb-2">生成提示:</h4>
           <ul className="text-xs text-blue-800 space-y-1">
-            <li>• 生成过程通常需要10-30秒，请耐心等待</li>
+            <li>• 生成过程通常需要30秒-2分钟，请耐心等待</li>
             <li>• 如果生成失败，可以尝试调整提示词后重试</li>
             <li>• 生成的图片会自动保存到历史记录中</li>
             <li>• 可以多次生成不同效果的图片</li>
+            <li>• 系统已优化超时设置，支持更长时间的AI生成</li>
           </ul>
         </div>
       </div>

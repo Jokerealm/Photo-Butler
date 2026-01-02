@@ -31,6 +31,8 @@ Thumbs.db
 # Uploads (temporary files)
 uploads/*
 !uploads/.gitignore
+backend/uploads/*
+!backend/uploads/.gitignore
 
 # TypeScript
 *.tsbuildinfo
@@ -43,3 +45,18 @@ playwright-report/
 
 # Development logs
 logs/
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Downloads
+downloads/
+backend/downloads/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Kiro specs (development only)
+.kiro/specs/

@@ -40,7 +40,7 @@ export class DoubaoAPIClient {
     return {
       apiKey,
       baseUrl,
-      timeout: 30000, // 30秒超时
+      timeout: 180000, // 3分钟超时，适合AI图片生成
       maxRetries: 3   // 最大重试3次
     };
   }
@@ -120,6 +120,17 @@ export class DoubaoAPIClient {
     if (error.response) {
       // 服务器返回错误响应
       const response = error.response.data as DoubaoAPIResponse;
+      const status = error.response.status;
+      
+      // 特殊处理429错误
+      if (status === 429) {
+        return {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: '请求过于频繁，请稍后重试',
+          details: response.data
+        };
+      }
+      
       return {
         code: response.code?.toString() || error.response.status.toString(),
         message: response.message || error.message,
@@ -160,13 +171,19 @@ export class DoubaoAPIClient {
         lastError = error as Error;
         console.warn(`[DoubaoAPI] Attempt ${attempt} failed:`, error);
 
+        // 如果是429错误，使用更长的延迟
+        const isRateLimit = error instanceof Error && 
+          (error.message.includes('429') || error.message.includes('rate limit'));
+
         // 如果是最后一次尝试，直接抛出错误
         if (attempt === maxRetries) {
           break;
         }
 
-        // 计算重试延迟（指数退避）
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+        // 计算重试延迟（指数退避，429错误使用更长延迟）
+        const baseDelay = isRateLimit ? 5000 : 1000; // 429错误等待5秒，其他错误等待1秒
+        const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 30000); // 最多等待30秒
+        
         console.log(`[DoubaoAPI] Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
@@ -339,7 +356,7 @@ export class DoubaoAPIClient {
    */
   async waitForTaskCompletion(
     taskId: string,
-    maxWaitTime: number = 60000, // 最大等待60秒
+    maxWaitTime: number = 180000, // 最大等待3分钟
     pollInterval: number = 2000   // 每2秒检查一次
   ): Promise<DoubaoTaskStatus> {
     const startTime = Date.now();

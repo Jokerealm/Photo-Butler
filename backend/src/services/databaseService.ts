@@ -55,7 +55,7 @@ export class DatabaseService {
   }
 
   /**
-   * Create database tables (users and orders for future use)
+   * Create database tables (users, orders, and tasks)
    */
   private async createTables(): Promise<void> {
     if (!this.db) {
@@ -84,6 +84,23 @@ export class DatabaseService {
       )
     `;
 
+    const createTasksTable = `
+      CREATE TABLE IF NOT EXISTS tasks (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(50) NOT NULL DEFAULT 'anonymous',
+        template_id VARCHAR(50) NOT NULL,
+        original_image_url TEXT NOT NULL,
+        generated_image_url TEXT,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        progress INTEGER DEFAULT 0,
+        custom_prompt TEXT,
+        error_message TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME
+      )
+    `;
+
     return new Promise((resolve, reject) => {
       this.db!.serialize(() => {
         this.db!.run(createUsersTable, (err) => {
@@ -102,6 +119,15 @@ export class DatabaseService {
             return;
           }
           console.log('Orders table created or already exists');
+        });
+
+        this.db!.run(createTasksTable, (err) => {
+          if (err) {
+            console.error('Error creating tasks table:', err);
+            reject(err);
+            return;
+          }
+          console.log('Tasks table created or already exists');
           resolve();
         });
       });

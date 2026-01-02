@@ -288,7 +288,7 @@ describe('TemplateMarketplace', () => {
         '生成任务已提交 (ID: test-task)',
         'success'
       );
-      expect(mockTemplateStore.closeModal).toHaveBeenCalled();
+      // Note: Modal is no longer automatically closed - TemplateModal handles confirmation flow
     });
   });
 
@@ -302,7 +302,16 @@ describe('TemplateMarketplace', () => {
       render(<TemplateMarketplace />);
       
       await waitFor(() => {
-        expect(mockTemplateStore.setTemplates).toHaveBeenCalledWith(mockTemplates);
+        // Check that setTemplates was called with enhanced templates (including empty template)
+        expect(mockTemplateStore.setTemplates).toHaveBeenCalled();
+        const calledWith = mockTemplateStore.setTemplates.mock.calls[0][0];
+        
+        // Should include the empty template as first item
+        expect(calledWith[0].id).toBe('empty-template');
+        expect(calledWith[0].name).toBe('默认空模板');
+        
+        // Should include the original templates (possibly enhanced)
+        expect(calledWith.length).toBeGreaterThanOrEqual(mockTemplates.length);
         expect(mockTemplateStore.setLoading).toHaveBeenCalledWith(false);
       });
     });
@@ -310,7 +319,7 @@ describe('TemplateMarketplace', () => {
     it('should handle API response with error flag', async () => {
       mockApiService.getTemplates.mockResolvedValue({
         success: false,
-        message: '服务器错误'
+        error: '服务器错误'
       });
 
       render(<TemplateMarketplace />);
@@ -338,7 +347,7 @@ describe('TemplateMarketplace', () => {
       const { container } = render(<TemplateMarketplace />);
       
       const grid = container.querySelector('.grid');
-      expect(grid).toHaveClass('grid-cols-1', 'sm:grid-cols-2', 'md:grid-cols-3', 'lg:grid-cols-4', 'xl:grid-cols-5');
+      expect(grid).toHaveClass('grid-cols-1', 'sm:grid-cols-2', 'lg:grid-cols-3', 'xl:grid-cols-4');
     });
   });
 });

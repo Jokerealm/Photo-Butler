@@ -146,7 +146,7 @@ const response = await fetch('/api/generate', {
 {
   "success": true,
   "data": {
-    "generatedImageUrl": "/uploads/generated-uuid.jpg",
+    "generatedImageUrl": "http://localhost:3001/uploads/generated-uuid.jpg",
     "generationId": "generation-uuid"
   }
 }

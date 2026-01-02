@@ -64,6 +64,9 @@ const LazyImage: React.FC<LazyImageProps> = ({
   // Generate responsive image sizes if not provided
   const responsiveSizes = sizes || '(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw';
 
+  // Use the src directly since Next.js rewrites handle the API routing
+  const imageUrl = src;
+
   // Common image props
   const imageProps = {
     alt,
@@ -101,20 +104,18 @@ const LazyImage: React.FC<LazyImageProps> = ({
 
       {/* Next.js optimized image */}
       {!hasError && (
-        fill ? (
-          <Image
-            src={src}
-            fill
-            {...imageProps}
-          />
-        ) : (
-          <Image
-            src={src}
-            width={width || 340}
-            height={height || 240}
-            {...imageProps}
-          />
-        )
+        <img
+          src={imageUrl}
+          alt={alt}
+          className={`object-cover transition-opacity duration-300 ${
+            isLoaded ? 'opacity-100' : 'opacity-0'
+          } ${className}`}
+          onLoad={handleLoad}
+          onError={handleError}
+          loading={loading}
+          width={width || 340}
+          height={height || 240}
+        />
       )}
 
       {/* Error state with retry */}

@@ -183,7 +183,12 @@ describe('GenerateController Property Tests', () => {
 
             await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-            // Verify successful response handling - success case calls json() directly
+            // Debug: Check what was actually called
+            console.log('mockJson calls:', mockJson.mock?.calls);
+            console.log('mockNext calls:', mockNext.mock?.calls);
+            console.log('mockStatus calls:', mockStatus.mock?.calls);
+
+            // Verify successful response handling - success case calls json() directly on response
             expect(mockJson).toHaveBeenCalledWith({
               success: true,
               data: {
@@ -192,7 +197,7 @@ describe('GenerateController Property Tests', () => {
               }
             });
 
-            // Verify status() is not called for success case
+            // Verify status() and next() are not called for success case
             expect(mockStatus).not.toHaveBeenCalled();
             expect(mockNext).not.toHaveBeenCalled();
           }

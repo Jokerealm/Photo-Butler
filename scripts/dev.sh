@@ -113,33 +113,58 @@ check_env_files() {
 check_ports() {
     log_info "检查端口占用情况..."
     
-    # 检查前端端口 3000
-    if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        log_warning "端口 3000 已被占用"
-        read -p "是否要杀死占用进程？(y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            lsof -ti:3000 | xargs kill -9
-            log_success "已杀死占用端口 3000 的进程"
-        else
-            log_error "端口 3000 被占用，无法启动前端服务"
-            exit 1
+    # 自动清理端口
+    log_info "自动清理开发端口..."
+    
+    # 清理前端端口 3000
+    if command -v lsof >/dev/null 2>&1; then
+        if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+            log_warning "端口 3000 已被占用，正在清理..."
+            lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+            sleep 1
+        fi
+    elif command -v netstat >/dev/null 2>&1; then
+        local pids=$(netstat -ano 2>/dev/null | grep ":3000 " | awk '{print $5}' | grep -v "0" | sort -u)
+        if [ ! -z "$pids" ]; then
+            log_warning "端口 3000 已被占用，正在清理..."
+            for pid in $pids; do
+                if [ "$pid" != "0" ] && [ ! -z "$pid" ]; then
+                    if command -v taskkill >/dev/null 2>&1; then
+                        taskkill //PID $pid //F 2>/dev/null || true
+                    else
+                        kill -9 $pid 2>/dev/null || true
+                    fi
+                fi
+            done
+            sleep 1
         fi
     fi
     
-    # 检查后端端口 3001
-    if lsof -Pi :3001 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        log_warning "端口 3001 已被占用"
-        read -p "是否要杀死占用进程？(y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            lsof -ti:3001 | xargs kill -9
-            log_success "已杀死占用端口 3001 的进程"
-        else
-            log_error "端口 3001 被占用，无法启动后端服务"
-            exit 1
+    # 清理后端端口 3001
+    if command -v lsof >/dev/null 2>&1; then
+        if lsof -Pi :3001 -sTCP:LISTEN -t >/dev/null 2>&1; then
+            log_warning "端口 3001 已被占用，正在清理..."
+            lsof -ti:3001 | xargs kill -9 2>/dev/null || true
+            sleep 1
+        fi
+    elif command -v netstat >/dev/null 2>&1; then
+        local pids=$(netstat -ano 2>/dev/null | grep ":3001 " | awk '{print $5}' | grep -v "0" | sort -u)
+        if [ ! -z "$pids" ]; then
+            log_warning "端口 3001 已被占用，正在清理..."
+            for pid in $pids; do
+                if [ "$pid" != "0" ] && [ ! -z "$pid" ]; then
+                    if command -v taskkill >/dev/null 2>&1; then
+                        taskkill //PID $pid //F 2>/dev/null || true
+                    else
+                        kill -9 $pid 2>/dev/null || true
+                    fi
+                fi
+            done
+            sleep 1
         fi
     fi
+    
+    log_success "端口清理完成"
 }
 
 # 创建必要的目录
@@ -174,9 +199,17 @@ start_servers() {
     # 创建日志目录
     mkdir -p logs
     
+    # 确保端口可用
+    log_info "最终检查端口可用性..."
+    sleep 2
+    
     # 启动后端服务器
     log_info "启动后端服务器 (端口 3001)..."
     cd backend
+    
+    # 设置端口环境变量
+    export PORT=3001
+    
     npm run dev > ../logs/backend-dev.log 2>&1 &
     BACKEND_PID=$!
     cd ..
@@ -184,8 +217,8 @@ start_servers() {
     # 等待后端启动
     log_info "等待后端服务器启动..."
     for i in {1..30}; do
-        if curl -s http://localhost:3001/api/templates > /dev/null 2>&1; then
-            log_success "后端服务器启动成功"
+        if curl -s http://localhost:3001/health > /dev/null 2>&1; then
+            log_success "后端服务器启动成功 (http://localhost:3001)"
             break
         fi
         if [ $i -eq 30 ]; then
@@ -199,6 +232,10 @@ start_servers() {
     # 启动前端服务器
     log_info "启动前端服务器 (端口 3000)..."
     cd frontend
+    
+    # 设置端口环境变量，强制使用3000端口
+    export PORT=3000
+    
     npm run dev > ../logs/frontend-dev.log 2>&1 &
     FRONTEND_PID=$!
     cd ..
@@ -206,8 +243,14 @@ start_servers() {
     # 等待前端启动
     log_info "等待前端服务器启动..."
     for i in {1..30}; do
+        # 检查3000端口或其他可能的端口
         if curl -s http://localhost:3000 > /dev/null 2>&1; then
-            log_success "前端服务器启动成功"
+            log_success "前端服务器启动成功 (http://localhost:3000)"
+            FRONTEND_URL="http://localhost:3000"
+            break
+        elif curl -s http://localhost:3003 > /dev/null 2>&1; then
+            log_warning "前端服务器在端口 3003 启动 (端口 3000 可能仍被占用)"
+            FRONTEND_URL="http://localhost:3003"
             break
         fi
         if [ $i -eq 30 ]; then
@@ -226,7 +269,7 @@ start_servers() {
     log_success "所有服务器启动完成！"
     echo
     echo "访问地址："
-    echo "  前端应用: http://localhost:3000"
+    echo "  前端应用: ${FRONTEND_URL:-http://localhost:3000}"
     echo "  后端API:  http://localhost:3001"
     echo
     echo "日志文件："

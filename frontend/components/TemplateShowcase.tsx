@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import LazyImage from './LazyImage';
+import { getTemplateDisplayText } from '../services/templateDescriptionService';
 
 // Template interface matching the backend type
 interface Template {
@@ -204,7 +205,7 @@ const TemplateShowcase: React.FC<TemplateShowcaseProps> = ({
                     {template.name}
                   </h3>
                   <p className="text-sm text-gray-600 line-clamp-2">
-                    {template.prompt}
+                    {getTemplateDisplayText(template)}
                   </p>
                   
                   {/* Category Badge */}

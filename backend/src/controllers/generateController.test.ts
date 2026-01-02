@@ -63,11 +63,11 @@ describe('GenerateController', () => {
 
       await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockStatus).toHaveBeenCalledWith(400);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: '缺少有效的图片ID参数'
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      const error = mockNext.mock.calls[0][0];
+      expect(error.message).toContain('缺少有效的图片ID参数');
+      expect(error.statusCode).toBe(400);
+    });
     });
 
     it('should validate required prompt parameter', async () => {
@@ -78,11 +78,10 @@ describe('GenerateController', () => {
 
       await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockStatus).toHaveBeenCalledWith(400);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: '缺少有效的提示词参数'
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      const error = mockNext.mock.calls[0][0];
+      expect(error.message).toContain('缺少有效的提示词参数');
+      expect(error.statusCode).toBe(400);
     });
 
     it('should validate required templateId parameter', async () => {
@@ -93,11 +92,10 @@ describe('GenerateController', () => {
 
       await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockStatus).toHaveBeenCalledWith(400);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: '缺少有效的模板ID参数'
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      const error = mockNext.mock.calls[0][0];
+      expect(error.message).toContain('缺少有效的模板ID参数');
+      expect(error.statusCode).toBe(400);
     });
 
     it('should validate empty prompt parameter', async () => {
@@ -109,11 +107,10 @@ describe('GenerateController', () => {
 
       await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockStatus).toHaveBeenCalledWith(400);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: '缺少有效的提示词参数'
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      const error = mockNext.mock.calls[0][0];
+      expect(error.message).toContain('缺少有效的提示词参数');
+      expect(error.statusCode).toBe(400);
     });
 
     it('should return error when reference image does not exist', async () => {
@@ -129,11 +126,10 @@ describe('GenerateController', () => {
 
       await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockStatus).toHaveBeenCalledWith(404);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: '参考图片不存在，请重新上传'
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      const error = mockNext.mock.calls[0][0];
+      expect(error.message).toContain('参考图片');
+      expect(error.statusCode).toBe(404);
     });
 
     it('should return error when template does not exist', async () => {
@@ -152,11 +148,10 @@ describe('GenerateController', () => {
 
       await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockStatus).toHaveBeenCalledWith(404);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: '指定的模板不存在'
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      const error = mockNext.mock.calls[0][0];
+      expect(error.message).toContain('模板');
+      expect(error.statusCode).toBe(404);
     });
 
     it('should successfully generate image when all parameters are valid', async () => {
@@ -196,13 +191,14 @@ describe('GenerateController', () => {
         templateId: 'template1'
       });
 
-      expect(mockJson).toHaveBeenCalledWith({
+      expect(mockResponse.json).toHaveBeenCalledWith({
         success: true,
         data: {
           generatedImageUrl: 'https://example.com/generated.jpg',
           generationId: expect.any(String)
         }
       });
+      expect(mockNext).not.toHaveBeenCalled();
     });
 
     it('should handle API generation failure', async () => {
@@ -233,11 +229,9 @@ describe('GenerateController', () => {
 
       await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockStatus).toHaveBeenCalledWith(500);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: 'API调用失败'
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      const error = mockNext.mock.calls[0][0];
+      expect(error.message).toBe('API调用失败');
     });
 
     it('should handle API success but no image URL returned', async () => {
@@ -271,11 +265,9 @@ describe('GenerateController', () => {
 
       await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockStatus).toHaveBeenCalledWith(500);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: '图片生成失败：未返回图片URL'
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      const error = mockNext.mock.calls[0][0];
+      expect(error.message).toBe('图片生成失败：未返回图片URL');
     });
 
     it('should handle timeout errors', async () => {
@@ -304,11 +296,7 @@ describe('GenerateController', () => {
 
       await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockStatus).toHaveBeenCalledWith(504);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: '请求超时，请稍后重试'
-      });
+      expect(mockNext).toHaveBeenCalledWith(timeoutError);
     });
 
     it('should handle network connection errors', async () => {
@@ -337,11 +325,7 @@ describe('GenerateController', () => {
 
       await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockStatus).toHaveBeenCalledWith(503);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: '网络连接失败，请检查网络连接'
-      });
+      expect(mockNext).toHaveBeenCalledWith(networkError);
     });
 
     it('should handle API key configuration errors', async () => {
@@ -370,11 +354,7 @@ describe('GenerateController', () => {
 
       await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockStatus).toHaveBeenCalledWith(500);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: 'API配置错误，请联系管理员'
-      });
+      expect(mockNext).toHaveBeenCalledWith(apiKeyError);
     });
 
     it('should handle generic errors', async () => {
@@ -403,11 +383,7 @@ describe('GenerateController', () => {
 
       await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockStatus).toHaveBeenCalledWith(500);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: 'Some unexpected error'
-      });
+      expect(mockNext).toHaveBeenCalledWith(genericError);
     });
 
     it('should validate imageId parameter type', async () => {
@@ -419,11 +395,10 @@ describe('GenerateController', () => {
 
       await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockStatus).toHaveBeenCalledWith(400);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: '缺少有效的图片ID参数'
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      const error = mockNext.mock.calls[0][0];
+      expect(error.message).toContain('缺少有效的图片ID参数');
+      expect(error.statusCode).toBe(400);
     });
 
     it('should validate prompt parameter type', async () => {
@@ -435,11 +410,10 @@ describe('GenerateController', () => {
 
       await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockStatus).toHaveBeenCalledWith(400);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: '缺少有效的提示词参数'
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      const error = mockNext.mock.calls[0][0];
+      expect(error.message).toContain('缺少有效的提示词参数');
+      expect(error.statusCode).toBe(400);
     });
 
     it('should validate templateId parameter type', async () => {
@@ -451,11 +425,10 @@ describe('GenerateController', () => {
 
       await controller.generateImage(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockStatus).toHaveBeenCalledWith(400);
-      expect(mockJson).toHaveBeenCalledWith({
-        success: false,
-        error: '缺少有效的模板ID参数'
-      });
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+      const error = mockNext.mock.calls[0][0];
+      expect(error.message).toContain('缺少有效的模板ID参数');
+      expect(error.statusCode).toBe(400);
     });
 
     it('should trim whitespace from prompt before processing', async () => {

@@ -14,9 +14,9 @@ export const SECURITY_CONFIG = {
   // Rate limiting
   RATE_LIMIT: {
     WINDOW_MS: 15 * 60 * 1000, // 15 minutes
-    MAX_REQUESTS: 100, // limit each IP to 100 requests per windowMs
-    UPLOAD_MAX_REQUESTS: 10, // stricter limit for uploads
-    GENERATE_MAX_REQUESTS: 5, // stricter limit for generation
+    MAX_REQUESTS: 500, // limit each IP to 500 requests per windowMs (increased from 100)
+    UPLOAD_MAX_REQUESTS: 50, // stricter limit for uploads (increased from 10)
+    GENERATE_MAX_REQUESTS: 30, // stricter limit for generation (increased from 5)
   },
   
   // File upload security

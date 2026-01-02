@@ -46,6 +46,21 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 </div>
               </Link>
               <Link
+                href="/create"
+                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                  pathname === '/create'
+                    ? 'bg-blue-500 text-white shadow-md'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  <span>AI创作</span>
+                </div>
+              </Link>
+              <Link
                 href="/workspace"
                 className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                   pathname === '/workspace'
@@ -74,8 +89,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       <footer className="bg-white border-t border-gray-200 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center text-gray-600">
-            <p className="mb-2">Photo Butler - 基于豆包API的AI图片生成应用</p>
-            <p className="text-sm">体验电商化的AI艺术创作流程</p>
+            <p className="mb-2">Photo Butler - 基于豆包的艺术照生成网站</p>
           </div>
         </div>
       </footer>

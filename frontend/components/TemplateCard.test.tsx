@@ -277,6 +277,7 @@ describe('TemplateCard', () => {
         ...mockTemplate,
         name: '',
         description: '',
+        prompt: '', // Also make prompt empty
         category: '',
         tags: []
       };
@@ -284,8 +285,8 @@ describe('TemplateCard', () => {
       render(<TemplateCard template={emptyTemplate} onClick={mockOnClick} />);
       
       expect(screen.getByTestId('template-card')).toBeInTheDocument();
-      expect(screen.getByTestId('template-name')).toHaveTextContent('');
-      expect(screen.getByTestId('template-description')).toHaveTextContent('');
+      expect(screen.getByTestId('template-name')).toBeEmptyDOMElement();
+      expect(screen.getByTestId('template-description')).toHaveTextContent('艺术图像生成');
     });
 
     it('should handle template with null/undefined optional fields', () => {

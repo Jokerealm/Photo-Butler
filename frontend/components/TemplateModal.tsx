@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Template, GenerationTask } from '../types';
 import { apiService } from '../services/apiService';
 import ImageUploader from './ImageUploader';
@@ -12,13 +13,84 @@ interface TemplateModalProps {
   onTaskSubmit: (task: GenerationTask) => void;
 }
 
+interface ConfirmationModalProps {
+  isOpen: boolean;
+  taskId: string;
+  onContinue: () => void;
+  onViewWorkspace: () => void;
+  onClose: () => void;
+}
+
+// Confirmation Modal Component
+function ConfirmationModal({ isOpen, taskId, onContinue, onViewWorkspace, onClose }: ConfirmationModalProps) {
+  const handleBackdropClick = useCallback((e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  }, [onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div 
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 p-4"
+      onClick={handleBackdropClick}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all duration-300 scale-100 opacity-100">
+        {/* Success Icon */}
+        <div className="flex justify-center mb-4">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+            <svg className="w-8 h-8 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Message */}
+        <div className="text-center mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            任务已添加到后台进行生成
+          </h3>
+          <p className="text-sm text-gray-600">
+            任务ID: {taskId}
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            您可以继续浏览模板或前往工作区查看生成进度
+          </p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={onContinue}
+            className="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+          >
+            继续生成
+          </button>
+          <button
+            onClick={onViewWorkspace}
+            className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+          >
+            去查看
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TemplateModal({ template, isOpen, onClose, onTaskSubmit }: TemplateModalProps) {
+  const router = useRouter();
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<GenerationTask | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  
+  // 添加提示词编辑状态
+  const [editablePrompt, setEditablePrompt] = useState<string>('');
+  const [isEditingPrompt, setIsEditingPrompt] = useState(false);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -29,8 +101,12 @@ export default function TemplateModal({ template, isOpen, onClose, onTaskSubmit 
       setSubmitError(null);
       setSubmitSuccess(null);
       setShowConfirmation(false);
+      setIsEditingPrompt(false);
+    } else {
+      // 当模态框打开时，初始化可编辑的提示词
+      setEditablePrompt(template.prompt);
     }
-  }, [isOpen]);
+  }, [isOpen, template.prompt]);
 
   // Handle escape key
   useEffect(() => {
@@ -63,6 +139,44 @@ export default function TemplateModal({ template, isOpen, onClose, onTaskSubmit 
     setSubmitError(null);
   }, []);
 
+  // 处理提示词编辑
+  const handlePromptEdit = useCallback(() => {
+    setIsEditingPrompt(true);
+  }, []);
+
+  const handlePromptSave = useCallback(() => {
+    setIsEditingPrompt(false);
+  }, []);
+
+  const handlePromptCancel = useCallback(() => {
+    setEditablePrompt(template.prompt);
+    setIsEditingPrompt(false);
+  }, [template.prompt]);
+
+  const handlePromptReset = useCallback(() => {
+    setEditablePrompt(template.prompt);
+  }, [template.prompt]);
+
+  // Confirmation modal handlers
+  const handleContinueGeneration = useCallback(() => {
+    setShowConfirmation(false);
+    // Reset form for next generation
+    setUploadedFile(null);
+    setPreviewUrl(null);
+    setSubmitError(null);
+    setSubmitSuccess(null);
+  }, []);
+
+  const handleViewWorkspace = useCallback(() => {
+    setShowConfirmation(false);
+    onClose();
+    router.push('/workspace');
+  }, [onClose, router]);
+
+  const handleCloseConfirmation = useCallback(() => {
+    setShowConfirmation(false);
+  }, []);
+
   const handleSubmit = useCallback(async () => {
     if (!uploadedFile) {
       setSubmitError('请先上传图片');
@@ -73,28 +187,37 @@ export default function TemplateModal({ template, isOpen, onClose, onTaskSubmit 
     setSubmitError(null);
 
     try {
-      const response = await apiService.createTask(template.id, uploadedFile);
+      // 使用编辑后的提示词，如果与原始提示词不同，则作为自定义提示词传递
+      const customPrompt = editablePrompt !== template.prompt ? editablePrompt : undefined;
+      
+      console.log('Creating task with:', {
+        templateId: template.id,
+        fileName: uploadedFile.name,
+        fileSize: uploadedFile.size,
+        customPrompt: customPrompt ? 'Custom prompt provided' : 'Using template prompt'
+      });
+      
+      const response = await apiService.createTask(template.id, uploadedFile, customPrompt);
+      
+      console.log('Task creation response:', response);
       
       if (response.success) {
         const task = response.data.task;
+        console.log('Task created successfully:', task.id);
         setSubmitSuccess(task);
         setShowConfirmation(true);
         onTaskSubmit(task);
-        
-        // Auto-hide confirmation after 3 seconds
-        setTimeout(() => {
-          setShowConfirmation(false);
-        }, 3000);
       } else {
-        throw new Error('任务提交失败');
+        throw new Error(response.error || '任务提交失败');
       }
     } catch (err) {
+      console.error('Task creation failed:', err);
       const errorMessage = err instanceof Error ? err.message : '提交失败，请重试';
       setSubmitError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
-  }, [uploadedFile, template.id, onTaskSubmit]);
+  }, [uploadedFile, template.id, template.prompt, editablePrompt, onTaskSubmit]);
 
   const handleBackdropClick = useCallback((e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -182,14 +305,71 @@ export default function TemplateModal({ template, isOpen, onClose, onTaskSubmit 
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">AI提示词</h3>
-                  <div className="bg-gray-900 rounded-lg p-4 max-h-48 overflow-y-auto">
-                    <pre className="text-sm text-green-400 font-mono leading-relaxed whitespace-pre-wrap">
-                      {template.prompt}
-                    </pre>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-semibold text-gray-900">AI提示词</h3>
+                    <div className="flex items-center space-x-2">
+                      {isEditingPrompt ? (
+                        <>
+                          <button
+                            onClick={handlePromptReset}
+                            className="px-3 py-1 text-xs text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                            title="重置为模板默认"
+                          >
+                            重置
+                          </button>
+                          <button
+                            onClick={handlePromptCancel}
+                            className="px-3 py-1 text-xs text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                          >
+                            取消
+                          </button>
+                          <button
+                            onClick={handlePromptSave}
+                            className="px-3 py-1 text-xs text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-colors"
+                          >
+                            保存
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={handlePromptEdit}
+                          className="px-3 py-1 text-xs text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors flex items-center space-x-1"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          <span>编辑</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
+                  
+                  {isEditingPrompt ? (
+                    <div className="space-y-3">
+                      <textarea
+                        value={editablePrompt}
+                        onChange={(e) => setEditablePrompt(e.target.value)}
+                        className="w-full h-48 p-4 border border-gray-300 rounded-lg resize-y focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-mono leading-relaxed"
+                        placeholder="编辑AI提示词..."
+                      />
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span>{editablePrompt.length} 字符</span>
+                        <span>提示：详细的描述有助于生成更好的效果</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-900 rounded-lg p-4 max-h-48 overflow-y-auto">
+                      <pre className="text-sm text-green-400 font-mono leading-relaxed whitespace-pre-wrap">
+                        {editablePrompt}
+                      </pre>
+                    </div>
+                  )}
+                  
                   <p className="text-xs text-gray-500 mt-2">
-                    此提示词将用于指导AI生成您的专属艺术作品
+                    {isEditingPrompt 
+                      ? '您可以根据需要修改提示词，以获得更符合期望的生成效果'
+                      : '此提示词将用于指导AI生成您的专属艺术作品'
+                    }
                   </p>
                 </div>
 
@@ -286,25 +466,6 @@ export default function TemplateModal({ template, isOpen, onClose, onTaskSubmit 
                   </div>
                 )}
 
-                {showConfirmation && submitSuccess && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 animate-pulse">
-                    <div className="flex items-start space-x-3">
-                      <svg className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      <div>
-                        <p className="text-sm text-green-700 font-medium">任务提交成功！</p>
-                        <p className="text-xs text-green-600 mt-1">
-                          任务ID: {submitSuccess.id}
-                        </p>
-                        <p className="text-xs text-green-600">
-                          您可以在&quot;作品仓库&quot;中查看生成进度
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                   <div className="flex items-start space-x-3">
                     <svg className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -335,6 +496,9 @@ export default function TemplateModal({ template, isOpen, onClose, onTaskSubmit 
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
                 已准备就绪
+                {editablePrompt !== template.prompt && (
+                  <span className="ml-2 text-blue-600">(已自定义提示词)</span>
+                )}
               </span>
             ) : (
               '请先上传参考图片'
@@ -350,9 +514,9 @@ export default function TemplateModal({ template, isOpen, onClose, onTaskSubmit 
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!uploadedFile || isSubmitting}
+              disabled={!uploadedFile || isSubmitting || isEditingPrompt}
               className={`flex-1 sm:flex-none px-6 sm:px-8 py-3 sm:py-2 rounded-lg font-medium transition-all duration-200 touch-manipulation ${
-                uploadedFile && !isSubmitting
+                uploadedFile && !isSubmitting && !isEditingPrompt
                   ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 shadow-lg hover:shadow-xl transform hover:scale-105'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
@@ -362,6 +526,8 @@ export default function TemplateModal({ template, isOpen, onClose, onTaskSubmit 
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                   <span>提交中...</span>
                 </div>
+              ) : isEditingPrompt ? (
+                '请先保存提示词'
               ) : (
                 <div className="flex items-center space-x-2">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -374,6 +540,17 @@ export default function TemplateModal({ template, isOpen, onClose, onTaskSubmit 
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmation && submitSuccess && (
+        <ConfirmationModal
+          isOpen={showConfirmation}
+          taskId={submitSuccess.id}
+          onContinue={handleContinueGeneration}
+          onViewWorkspace={handleViewWorkspace}
+          onClose={handleCloseConfirmation}
+        />
+      )}
     </div>
   );
 }
